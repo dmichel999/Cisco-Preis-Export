@@ -2,6 +2,12 @@
 
 Format nach [Keep a Changelog](https://keepachangelog.com/de/1.0.0/), Versionierung nach [SemVer](https://semver.org/lang/de/).
 
+## [0.6.0] - 2026-08-14
+
+### Added
+
+- Datum der Kursermittlung in der Zeile über der Kurs-Zelle (aktuell AF38, Format `TT.MM.JJJJ`) — die Zeile existiert im Original oft nicht und wird bei Bedarf neu angelegt.
+
 ## [0.5.0] - 2026-08-14
 
 ### Changed

@@ -1,7 +1,7 @@
 // thought up by human, coded by ai
 'use strict';
 
-const APP_VERSION = '0.5.0';
+const APP_VERSION = '0.6.0';
 
 const HEADER_TEXT_CREDITS = 'Credits';
 const HEADER_TEXT_CUSTOM_NAME = 'Custom Name';
@@ -74,6 +74,12 @@ function bumpRowSpans(rowEl, newColIndex) {
 
 function roundToCents(value) {
   return Math.round((value + Number.EPSILON) * 100) / 100;
+}
+
+function formatDateDE(date) {
+  const dd = String(date.getDate()).padStart(2, '0');
+  const mm = String(date.getMonth() + 1).padStart(2, '0');
+  return `${dd}.${mm}.${date.getFullYear()}`;
 }
 
 function serializeWithDeclaration(doc) {
@@ -290,6 +296,7 @@ async function processFile(file, rate) {
   const { headerRow, creditsCol, customNameCol, dataRows } = findQuoteTable(sheetDoc, sharedStrings);
 
   const NS = sheetDoc.documentElement.namespaceURI;
+  const sheetDataEl = sheetDoc.getElementsByTagName('sheetData')[0];
   const newColIndex = customNameCol + 1;
   const newColLetters = colIndexToLetters(newColIndex);
 
@@ -322,6 +329,34 @@ async function processFile(file, rate) {
     rateCell.appendChild(rateValueEl);
     rateRow.appendChild(rateCell);
     bumpRowSpans(rateRow, newColIndex);
+  }
+
+  // Date note two rows above the header (e.g. AF38) so it's clear how current the
+  // rate is. That row is often entirely empty in the source file (sparse XML omits
+  // empty rows), so it may need to be created rather than just appended to.
+  if (rateRow && rateRow.tagName === 'row') {
+    const dateRowNum = parseInt(rateRow.getAttribute('r'), 10) - 1;
+    let dateRow = Array.from(sheetDataEl.getElementsByTagName('row')).find(
+      (row) => parseInt(row.getAttribute('r'), 10) === dateRowNum
+    );
+    if (!dateRow) {
+      dateRow = sheetDoc.createElementNS(NS, 'row');
+      dateRow.setAttribute('r', String(dateRowNum));
+      dateRow.setAttribute('spans', `${newColIndex}:${newColIndex}`);
+      sheetDataEl.insertBefore(dateRow, rateRow);
+    } else {
+      bumpRowSpans(dateRow, newColIndex);
+    }
+    const dateCell = sheetDoc.createElementNS(NS, 'c');
+    dateCell.setAttribute('r', `${newColLetters}${dateRowNum}`);
+    dateCell.setAttribute('s', rateStyleId);
+    dateCell.setAttribute('t', 'inlineStr');
+    const dateIsEl = sheetDoc.createElementNS(NS, 'is');
+    const dateTextEl = sheetDoc.createElementNS(NS, 't');
+    dateTextEl.textContent = formatDateDE(new Date());
+    dateIsEl.appendChild(dateTextEl);
+    dateCell.appendChild(dateIsEl);
+    dateRow.appendChild(dateCell);
   }
 
   // New header cell
@@ -358,7 +393,6 @@ async function processFile(file, rate) {
 
   // Hide Credits..Custom Name columns
   let colsEl = sheetDoc.getElementsByTagName('cols')[0];
-  const sheetDataEl = sheetDoc.getElementsByTagName('sheetData')[0];
   if (!colsEl) {
     colsEl = sheetDoc.createElementNS(NS, 'cols');
     sheetDataEl.parentNode.insertBefore(colsEl, sheetDataEl);
