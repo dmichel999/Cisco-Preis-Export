@@ -1,7 +1,7 @@
 // thought up by human, coded by ai
 'use strict';
 
-const APP_VERSION = '0.1.1';
+const APP_VERSION = '0.2.0';
 
 const HEADER_TEXT_CREDITS = 'Credits';
 const HEADER_TEXT_CUSTOM_NAME = 'Custom Name';
@@ -227,7 +227,7 @@ async function processFile(file, rate) {
 
   // New data cells
   for (const { row, value } of dataRows) {
-    const eur = roundToCents(value * rate);
+    const eur = roundToCents(value / rate);
     const cell = sheetDoc.createElementNS(NS, 'c');
     cell.setAttribute('r', `${newColLetters}${row.getAttribute('r')}`);
     if (dataStyle) cell.setAttribute('s', dataStyle);

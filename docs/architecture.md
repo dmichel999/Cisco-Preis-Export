@@ -30,7 +30,7 @@ Für die neue Spalte werden bestehende `cellXfs`-Style-IDs wiederverwendet (Kopf
 
 ## Kein Cent-Rundungsfehler durch Gleitkomma
 
-Rundung erfolgt über `Math.round(value * 100) / 100` auf den bereits mit dem Kurs multiplizierten Wert — kaufmännische Rundung auf 2 Nachkommastellen, wie in der Quelltabelle (Format `#,##0.00`) üblich.
+Der Kurs wird als **USD pro EUR** verstanden (Cisco-Dealkurse werden so angegeben, z. B. `1.08`) — der USD-Preis wird also durch den Kurs geteilt, nicht multipliziert. Rundung erfolgt über `Math.round(value * 100) / 100` auf den bereits geteilten Wert — kaufmännische Rundung auf 2 Nachkommastellen, wie in der Quelltabelle (Format `#,##0.00`) üblich.
 
 ## Download: Overwrite-Semantik
 

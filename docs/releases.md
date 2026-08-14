@@ -2,6 +2,12 @@
 
 Format nach [Keep a Changelog](https://keepachangelog.com/de/1.0.0/), Versionierung nach [SemVer](https://semver.org/lang/de/).
 
+## [0.2.0] - 2026-08-14
+
+### Changed
+
+- **Breaking:** Kurs-Konvention von "EUR pro USD" (multiplizieren) auf "USD pro EUR" (dividieren) umgestellt — entspricht der Angabe von Cisco-Dealkursen (z. B. `1,08`) und der tatsächlichen Erwartung des Users. Formel: EUR-Preis = USD-Preis ÷ Kurs.
+
 ## [0.1.1] - 2026-08-14
 
 ### Fixed

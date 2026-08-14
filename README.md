@@ -7,7 +7,7 @@ Browser-basiertes Tool zur Umrechnung von Cisco-Preisangeboten (Quote-Export als
 Aus dem Cisco-Portal heruntergeladene Preisangebote (`Quote_*.xlsx`) enthalten unter anderem die Spalten "Credits" bis "Custom Name" mit internen Rabatt-/Credit-Details, die für die Weitergabe an Kunden nicht relevant sind, sowie den Nettopreis in USD. Bisher wurde von Hand:
 
 1. Die Spalten "Credits" bis "Custom Name" ausgeblendet
-2. Der aktuelle USD→EUR-Umrechnungskurs recherchiert
+2. Der aktuelle Wechselkurs (USD pro EUR) recherchiert
 3. Eine neue Spalte mit dem umgerechneten Preis in EUR ergänzt
 
 Dieses Tool automatisiert alle drei Schritte.
@@ -17,7 +17,7 @@ Dieses Tool automatisiert alle drei Schritte.
 1. Ordner kopieren oder Repository klonen
 2. `Cisco Preis Export.html` im Browser öffnen
 3. Quote-Datei per Drag & Drop in die Drop-Zone ziehen (oder per Klick auswählen)
-4. Umrechnungskurs eingeben (USD → EUR)
+4. Wechselkurs eingeben (USD pro EUR, z. B. `1,08`)
 5. Bearbeitete Datei herunterladen
 
 Details zur Spalten-/Zeilenerkennung: siehe [docs/architecture.md](docs/architecture.md).
