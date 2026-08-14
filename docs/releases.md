@@ -2,6 +2,13 @@
 
 Format nach [Keep a Changelog](https://keepachangelog.com/de/1.0.0/), Versionierung nach [SemVer](https://semver.org/lang/de/).
 
+## [0.3.0] - 2026-08-14
+
+### Added
+
+- Kurs-Hinweis in der Zeile direkt über der Kopfzeile (aktuell AF39): "Kurs: {Kurs} USD/EUR"
+- Neue Spalte "Price EUR" (Kopfzeile + alle Datenzeilen + Kurs-Hinweis-Zeile) wird gelb hinterlegt (`#FFFF01`) — dafür wird `xl/styles.xml` jetzt ebenfalls gezielt ergänzt (neuer `fill` + zwei `cellXfs`-Klone), siehe docs/architecture.md
+
 ## [0.2.0] - 2026-08-14
 
 ### Changed

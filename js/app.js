@@ -1,12 +1,13 @@
 // thought up by human, coded by ai
 'use strict';
 
-const APP_VERSION = '0.2.0';
+const APP_VERSION = '0.3.0';
 
 const HEADER_TEXT_CREDITS = 'Credits';
 const HEADER_TEXT_CUSTOM_NAME = 'Custom Name';
 const HEADER_TEXT_SOURCE_PRICE = 'Unit Net Price Before Credits';
 const NEW_COLUMN_HEADER = 'Price EUR';
+const HIGHLIGHT_FILL_ARGB = 'FFFFFF01';
 
 function colLettersToIndex(letters) {
   let idx = 0;
@@ -71,6 +72,17 @@ function bumpRowSpans(rowEl, newColIndex) {
 
 function roundToCents(value) {
   return Math.round((value + Number.EPSILON) * 100) / 100;
+}
+
+function serializeWithDeclaration(doc) {
+  // Some engines (e.g. WebKit) already include the XML declaration in
+  // serializeToString output, others (e.g. Chromium) never do — only add
+  // ours if it's missing, otherwise the file ends up with two declarations
+  // (invalid XML, triggers Excel's "repair" prompt).
+  const serialized = new XMLSerializer().serializeToString(doc);
+  return serialized.startsWith('<?xml')
+    ? serialized
+    : `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\r\n${serialized}`;
 }
 
 async function findFirstSheetPath(zip) {
@@ -183,6 +195,54 @@ function findQuoteTable(sheetDoc, sharedStrings) {
   return { headerRow, creditsCol, customNameCol, sourceCol, dataRows };
 }
 
+async function addHighlightStyles(zip, baseHeaderStyleId, baseDataStyleId) {
+  const stylesFile = zip.file('xl/styles.xml');
+  if (!stylesFile) throw new Error('xl/styles.xml fehlt in der Datei.');
+  const stylesXml = await stylesFile.async('string');
+  const stylesDoc = new DOMParser().parseFromString(stylesXml, 'application/xml');
+  assertNoParserError(stylesDoc, 'xl/styles.xml');
+  const NS = stylesDoc.documentElement.namespaceURI;
+
+  const fillsEl = stylesDoc.getElementsByTagName('fills')[0];
+  const cellXfsEl = stylesDoc.getElementsByTagName('cellXfs')[0];
+  if (!fillsEl || !cellXfsEl) {
+    throw new Error('Unerwartete Struktur in xl/styles.xml (fills/cellXfs fehlen).');
+  }
+
+  const fillIndex = fillsEl.getElementsByTagName('fill').length;
+  const fillEl = stylesDoc.createElementNS(NS, 'fill');
+  const patternFillEl = stylesDoc.createElementNS(NS, 'patternFill');
+  patternFillEl.setAttribute('patternType', 'solid');
+  const fgColorEl = stylesDoc.createElementNS(NS, 'fgColor');
+  fgColorEl.setAttribute('rgb', HIGHLIGHT_FILL_ARGB);
+  const bgColorEl = stylesDoc.createElementNS(NS, 'bgColor');
+  bgColorEl.setAttribute('indexed', '64');
+  patternFillEl.appendChild(fgColorEl);
+  patternFillEl.appendChild(bgColorEl);
+  fillEl.appendChild(patternFillEl);
+  fillsEl.appendChild(fillEl);
+  fillsEl.setAttribute('count', String(fillsEl.getElementsByTagName('fill').length));
+
+  function addFillVariant(baseStyleId) {
+    const xfs = cellXfsEl.getElementsByTagName('xf');
+    const base = xfs[parseInt(baseStyleId, 10)];
+    if (!base) throw new Error(`Basis-Style "${baseStyleId}" für die Spaltenfarbe nicht gefunden.`);
+    const clone = base.cloneNode(true);
+    clone.setAttribute('fillId', String(fillIndex));
+    clone.setAttribute('applyFill', '1');
+    const newIndex = xfs.length;
+    cellXfsEl.appendChild(clone);
+    return String(newIndex);
+  }
+
+  const headerStyleId = addFillVariant(baseHeaderStyleId || '0');
+  const dataStyleId = addFillVariant(baseDataStyleId || '0');
+  cellXfsEl.setAttribute('count', String(cellXfsEl.getElementsByTagName('xf').length));
+
+  zip.file('xl/styles.xml', serializeWithDeclaration(stylesDoc), { createFolders: false });
+  return { headerStyleId, dataStyleId };
+}
+
 async function processFile(file, rate) {
   const buffer = await file.arrayBuffer();
   let zip;
@@ -212,10 +272,33 @@ async function processFile(file, rate) {
   const headerStyle = creditsHeaderCell ? creditsHeaderCell.getAttribute('s') : null;
   const dataStyle = dataRows[0].sourceCell.getAttribute('s');
 
+  const { headerStyleId: yellowHeaderStyle, dataStyleId: yellowDataStyle } = await addHighlightStyles(
+    zip,
+    headerStyle,
+    dataStyle
+  );
+
+  // Rate note directly above the header row (e.g. AF39 when the header is row 40)
+  const rateRow = headerRow.previousElementSibling;
+  if (rateRow && rateRow.tagName === 'row') {
+    const rateDisplay = String(rate).replace('.', ',');
+    const rateCell = sheetDoc.createElementNS(NS, 'c');
+    rateCell.setAttribute('r', `${newColLetters}${rateRow.getAttribute('r')}`);
+    rateCell.setAttribute('s', yellowHeaderStyle);
+    rateCell.setAttribute('t', 'inlineStr');
+    const rateIsEl = sheetDoc.createElementNS(NS, 'is');
+    const rateTextEl = sheetDoc.createElementNS(NS, 't');
+    rateTextEl.textContent = `Kurs: ${rateDisplay} USD/EUR`;
+    rateIsEl.appendChild(rateTextEl);
+    rateCell.appendChild(rateIsEl);
+    rateRow.appendChild(rateCell);
+    bumpRowSpans(rateRow, newColIndex);
+  }
+
   // New header cell
   const headerCell = sheetDoc.createElementNS(NS, 'c');
   headerCell.setAttribute('r', `${newColLetters}${headerRow.getAttribute('r')}`);
-  if (headerStyle) headerCell.setAttribute('s', headerStyle);
+  headerCell.setAttribute('s', yellowHeaderStyle);
   headerCell.setAttribute('t', 'inlineStr');
   const isEl = sheetDoc.createElementNS(NS, 'is');
   const headerTextEl = sheetDoc.createElementNS(NS, 't');
@@ -230,7 +313,7 @@ async function processFile(file, rate) {
     const eur = roundToCents(value / rate);
     const cell = sheetDoc.createElementNS(NS, 'c');
     cell.setAttribute('r', `${newColLetters}${row.getAttribute('r')}`);
-    if (dataStyle) cell.setAttribute('s', dataStyle);
+    cell.setAttribute('s', yellowDataStyle);
     const vEl = sheetDoc.createElementNS(NS, 'v');
     vEl.textContent = String(eur);
     cell.appendChild(vEl);
@@ -269,17 +352,9 @@ async function processFile(file, rate) {
     }
   }
 
-  // Some engines (e.g. WebKit) already include the XML declaration in
-  // serializeToString output, others (e.g. Chromium) never do — only add
-  // ours if it's missing, otherwise the file ends up with two declarations
-  // (invalid XML, triggers Excel's "repair" prompt).
-  const serialized = new XMLSerializer().serializeToString(sheetDoc);
-  const xmlWithDeclaration = serialized.startsWith('<?xml')
-    ? serialized
-    : `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\r\n${serialized}`;
   // createFolders:false avoids JSZip adding synthetic 'xl/' / 'xl/worksheets/'
   // directory entries that aren't present in the original file.
-  zip.file(sheetPath, xmlWithDeclaration, { createFolders: false });
+  zip.file(sheetPath, serializeWithDeclaration(sheetDoc), { createFolders: false });
 
   return zip.generateAsync({
     type: 'blob',
