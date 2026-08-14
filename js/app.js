@@ -1,7 +1,7 @@
 // thought up by human, coded by ai
 'use strict';
 
-const APP_VERSION = '0.1.0';
+const APP_VERSION = '0.1.1';
 
 const HEADER_TEXT_CREDITS = 'Credits';
 const HEADER_TEXT_CUSTOM_NAME = 'Custom Name';
@@ -269,13 +269,22 @@ async function processFile(file, rate) {
     }
   }
 
+  // Some engines (e.g. WebKit) already include the XML declaration in
+  // serializeToString output, others (e.g. Chromium) never do — only add
+  // ours if it's missing, otherwise the file ends up with two declarations
+  // (invalid XML, triggers Excel's "repair" prompt).
   const serialized = new XMLSerializer().serializeToString(sheetDoc);
-  const xmlWithDeclaration = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\r\n${serialized}`;
-  zip.file(sheetPath, xmlWithDeclaration);
+  const xmlWithDeclaration = serialized.startsWith('<?xml')
+    ? serialized
+    : `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\r\n${serialized}`;
+  // createFolders:false avoids JSZip adding synthetic 'xl/' / 'xl/worksheets/'
+  // directory entries that aren't present in the original file.
+  zip.file(sheetPath, xmlWithDeclaration, { createFolders: false });
 
   return zip.generateAsync({
     type: 'blob',
     mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    compression: 'DEFLATE',
   });
 }
 
