@@ -1,15 +1,15 @@
 // thought up by human, coded by ai
 'use strict';
 
-const APP_VERSION = '0.4.0';
+const APP_VERSION = '0.5.0';
 
 const HEADER_TEXT_CREDITS = 'Credits';
 const HEADER_TEXT_CUSTOM_NAME = 'Custom Name';
 const HEADER_TEXT_SOURCE_PRICE = 'Unit Net Price Before Credits';
 const NEW_COLUMN_HEADER = 'Price EUR';
 const HIGHLIGHT_FILL_ARGB = 'FFFFFF01';
-const RATE_LABEL_PREFIX = 'Kurs USD/EUR: ';
-const RATE_NUM_FMT_ID_BASE = 164; // custom number format IDs conventionally start at 164
+const EUR_NUM_FMT_CODE = '#,##0.00" €"';
+const CUSTOM_NUM_FMT_ID_BASE = 164; // custom number format IDs conventionally start at 164
 
 function colLettersToIndex(letters) {
   let idx = 0;
@@ -225,8 +225,8 @@ async function addHighlightStyles(zip, baseHeaderStyleId, baseDataStyleId) {
   fillsEl.appendChild(fillEl);
   fillsEl.setAttribute('count', String(fillsEl.getElementsByTagName('fill').length));
 
-  // Custom number format so the rate cell can show a label ("Kurs USD/EUR: 1,58")
-  // while remaining a plain, formula-referenceable number.
+  // Custom number format so the computed prices display with a Euro sign
+  // (e.g. "6.924,42 €") while remaining plain, formula-usable numbers.
   let numFmtsEl = stylesDoc.getElementsByTagName('numFmts')[0];
   if (!numFmtsEl) {
     numFmtsEl = stylesDoc.createElementNS(NS, 'numFmts');
@@ -236,11 +236,11 @@ async function addHighlightStyles(zip, baseHeaderStyleId, baseDataStyleId) {
   const usedNumFmtIds = Array.from(numFmtsEl.getElementsByTagName('numFmt')).map((el) =>
     parseInt(el.getAttribute('numFmtId'), 10)
   );
-  let rateNumFmtId = RATE_NUM_FMT_ID_BASE;
-  while (usedNumFmtIds.includes(rateNumFmtId)) rateNumFmtId++;
+  let eurNumFmtId = CUSTOM_NUM_FMT_ID_BASE;
+  while (usedNumFmtIds.includes(eurNumFmtId)) eurNumFmtId++;
   const numFmtEl = stylesDoc.createElementNS(NS, 'numFmt');
-  numFmtEl.setAttribute('numFmtId', String(rateNumFmtId));
-  numFmtEl.setAttribute('formatCode', `"${RATE_LABEL_PREFIX}"0.00`);
+  numFmtEl.setAttribute('numFmtId', String(eurNumFmtId));
+  numFmtEl.setAttribute('formatCode', EUR_NUM_FMT_CODE);
   numFmtsEl.appendChild(numFmtEl);
   numFmtsEl.setAttribute('count', String(numFmtsEl.getElementsByTagName('numFmt').length));
 
@@ -261,8 +261,9 @@ async function addHighlightStyles(zip, baseHeaderStyleId, baseDataStyleId) {
   }
 
   const headerStyleId = addFillVariant(baseHeaderStyleId || '0');
-  const dataStyleId = addFillVariant(baseDataStyleId || '0');
-  const rateStyleId = addFillVariant(baseHeaderStyleId || '0', rateNumFmtId);
+  const dataStyleId = addFillVariant(baseDataStyleId || '0', eurNumFmtId);
+  // Rate cell keeps the base (General) number format — plain number, no label.
+  const rateStyleId = addFillVariant(baseHeaderStyleId || '0');
   cellXfsEl.setAttribute('count', String(cellXfsEl.getElementsByTagName('xf').length));
 
   zip.file('xl/styles.xml', serializeWithDeclaration(stylesDoc), { createFolders: false });

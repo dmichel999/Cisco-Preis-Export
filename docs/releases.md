@@ -2,6 +2,13 @@
 
 Format nach [Keep a Changelog](https://keepachangelog.com/de/1.0.0/), Versionierung nach [SemVer](https://semver.org/lang/de/).
 
+## [0.5.0] - 2026-08-14
+
+### Changed
+
+- AF39 zeigt jetzt nur die reine Kurszahl an, ohne Beschriftung ("Kurs USD/EUR: ..." entfernt).
+- Die berechneten Preise in Spalte AF werden im Euro-Zahlenformat angezeigt (`#,##0.00 €`).
+
 ## [0.4.0] - 2026-08-14
 
 ### Changed
