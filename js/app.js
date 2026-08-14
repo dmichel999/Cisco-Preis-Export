@@ -1,13 +1,15 @@
 // thought up by human, coded by ai
 'use strict';
 
-const APP_VERSION = '0.3.0';
+const APP_VERSION = '0.4.0';
 
 const HEADER_TEXT_CREDITS = 'Credits';
 const HEADER_TEXT_CUSTOM_NAME = 'Custom Name';
 const HEADER_TEXT_SOURCE_PRICE = 'Unit Net Price Before Credits';
 const NEW_COLUMN_HEADER = 'Price EUR';
 const HIGHLIGHT_FILL_ARGB = 'FFFFFF01';
+const RATE_LABEL_PREFIX = 'Kurs USD/EUR: ';
+const RATE_NUM_FMT_ID_BASE = 164; // custom number format IDs conventionally start at 164
 
 function colLettersToIndex(letters) {
   let idx = 0;
@@ -223,13 +225,36 @@ async function addHighlightStyles(zip, baseHeaderStyleId, baseDataStyleId) {
   fillsEl.appendChild(fillEl);
   fillsEl.setAttribute('count', String(fillsEl.getElementsByTagName('fill').length));
 
-  function addFillVariant(baseStyleId) {
+  // Custom number format so the rate cell can show a label ("Kurs USD/EUR: 1,58")
+  // while remaining a plain, formula-referenceable number.
+  let numFmtsEl = stylesDoc.getElementsByTagName('numFmts')[0];
+  if (!numFmtsEl) {
+    numFmtsEl = stylesDoc.createElementNS(NS, 'numFmts');
+    numFmtsEl.setAttribute('count', '0');
+    stylesDoc.documentElement.insertBefore(numFmtsEl, stylesDoc.documentElement.firstElementChild);
+  }
+  const usedNumFmtIds = Array.from(numFmtsEl.getElementsByTagName('numFmt')).map((el) =>
+    parseInt(el.getAttribute('numFmtId'), 10)
+  );
+  let rateNumFmtId = RATE_NUM_FMT_ID_BASE;
+  while (usedNumFmtIds.includes(rateNumFmtId)) rateNumFmtId++;
+  const numFmtEl = stylesDoc.createElementNS(NS, 'numFmt');
+  numFmtEl.setAttribute('numFmtId', String(rateNumFmtId));
+  numFmtEl.setAttribute('formatCode', `"${RATE_LABEL_PREFIX}"0.00`);
+  numFmtsEl.appendChild(numFmtEl);
+  numFmtsEl.setAttribute('count', String(numFmtsEl.getElementsByTagName('numFmt').length));
+
+  function addFillVariant(baseStyleId, extraNumFmtId) {
     const xfs = cellXfsEl.getElementsByTagName('xf');
     const base = xfs[parseInt(baseStyleId, 10)];
     if (!base) throw new Error(`Basis-Style "${baseStyleId}" für die Spaltenfarbe nicht gefunden.`);
     const clone = base.cloneNode(true);
     clone.setAttribute('fillId', String(fillIndex));
     clone.setAttribute('applyFill', '1');
+    if (extraNumFmtId != null) {
+      clone.setAttribute('numFmtId', String(extraNumFmtId));
+      clone.setAttribute('applyNumberFormat', '1');
+    }
     const newIndex = xfs.length;
     cellXfsEl.appendChild(clone);
     return String(newIndex);
@@ -237,10 +262,11 @@ async function addHighlightStyles(zip, baseHeaderStyleId, baseDataStyleId) {
 
   const headerStyleId = addFillVariant(baseHeaderStyleId || '0');
   const dataStyleId = addFillVariant(baseDataStyleId || '0');
+  const rateStyleId = addFillVariant(baseHeaderStyleId || '0', rateNumFmtId);
   cellXfsEl.setAttribute('count', String(cellXfsEl.getElementsByTagName('xf').length));
 
   zip.file('xl/styles.xml', serializeWithDeclaration(stylesDoc), { createFolders: false });
-  return { headerStyleId, dataStyleId };
+  return { headerStyleId, dataStyleId, rateStyleId };
 }
 
 async function processFile(file, rate) {
@@ -272,25 +298,27 @@ async function processFile(file, rate) {
   const headerStyle = creditsHeaderCell ? creditsHeaderCell.getAttribute('s') : null;
   const dataStyle = dataRows[0].sourceCell.getAttribute('s');
 
-  const { headerStyleId: yellowHeaderStyle, dataStyleId: yellowDataStyle } = await addHighlightStyles(
-    zip,
-    headerStyle,
-    dataStyle
-  );
+  const {
+    headerStyleId: yellowHeaderStyle,
+    dataStyleId: yellowDataStyle,
+    rateStyleId,
+  } = await addHighlightStyles(zip, headerStyle, dataStyle);
 
-  // Rate note directly above the header row (e.g. AF39 when the header is row 40)
+  // Rate cell directly above the header row (e.g. AF39 when the header is row 40).
+  // Stored as a plain number (custom number format only adds a display label) so
+  // it can be edited in Excel and referenced by the price formulas below — editing
+  // it there recalculates every price automatically, no re-upload needed.
   const rateRow = headerRow.previousElementSibling;
+  let rateCellRef = null;
   if (rateRow && rateRow.tagName === 'row') {
-    const rateDisplay = String(rate).replace('.', ',');
+    const rateRowNum = rateRow.getAttribute('r');
+    rateCellRef = `$${newColLetters}$${rateRowNum}`;
     const rateCell = sheetDoc.createElementNS(NS, 'c');
-    rateCell.setAttribute('r', `${newColLetters}${rateRow.getAttribute('r')}`);
-    rateCell.setAttribute('s', yellowHeaderStyle);
-    rateCell.setAttribute('t', 'inlineStr');
-    const rateIsEl = sheetDoc.createElementNS(NS, 'is');
-    const rateTextEl = sheetDoc.createElementNS(NS, 't');
-    rateTextEl.textContent = `Kurs: ${rateDisplay} USD/EUR`;
-    rateIsEl.appendChild(rateTextEl);
-    rateCell.appendChild(rateIsEl);
+    rateCell.setAttribute('r', `${newColLetters}${rateRowNum}`);
+    rateCell.setAttribute('s', rateStyleId);
+    const rateValueEl = sheetDoc.createElementNS(NS, 'v');
+    rateValueEl.textContent = String(rate);
+    rateCell.appendChild(rateValueEl);
     rateRow.appendChild(rateCell);
     bumpRowSpans(rateRow, newColIndex);
   }
@@ -308,12 +336,18 @@ async function processFile(file, rate) {
   headerRow.appendChild(headerCell);
   bumpRowSpans(headerRow, newColIndex);
 
-  // New data cells
-  for (const { row, value } of dataRows) {
+  // New data cells — a real formula referencing the rate cell when available,
+  // so changing the rate in Excel recalculates every price automatically.
+  for (const { row, value, sourceCell } of dataRows) {
     const eur = roundToCents(value / rate);
     const cell = sheetDoc.createElementNS(NS, 'c');
     cell.setAttribute('r', `${newColLetters}${row.getAttribute('r')}`);
     cell.setAttribute('s', yellowDataStyle);
+    if (rateCellRef) {
+      const fEl = sheetDoc.createElementNS(NS, 'f');
+      fEl.textContent = `ROUND(${sourceCell.getAttribute('r')}/${rateCellRef},2)`;
+      cell.appendChild(fEl);
+    }
     const vEl = sheetDoc.createElementNS(NS, 'v');
     vEl.textContent = String(eur);
     cell.appendChild(vEl);
@@ -461,7 +495,10 @@ function initUI() {
       if (result === 'cancelled') {
         setStatus('Speichern abgebrochen.', null);
       } else {
-        setStatus(`Fertig — Spalte "${NEW_COLUMN_HEADER}" mit Kurs ${rate} ergänzt.`, 'success');
+        setStatus(
+          `Fertig — Spalte "${NEW_COLUMN_HEADER}" mit Kurs ${rate} ergänzt. Kurs in AF39 anpassen berechnet alle Preise in Excel automatisch neu.`,
+          'success'
+        );
       }
     } catch (err) {
       console.error(err);

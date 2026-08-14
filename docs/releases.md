@@ -2,6 +2,12 @@
 
 Format nach [Keep a Changelog](https://keepachangelog.com/de/1.0.0/), Versionierung nach [SemVer](https://semver.org/lang/de/).
 
+## [0.4.0] - 2026-08-14
+
+### Changed
+
+- **Breaking:** AF39 enthält jetzt die Kurszahl selbst (echte, editierbare Zahl mit Beschriftungs-Zahlenformat "Kurs USD/EUR: 1,58") statt eines reinen Textvermerks. Alle Preise in Spalte AF sind jetzt echte Excel-Formeln (`=ROUND(<Quelle>/$AF$39,2)`) statt fester Werte — Kurs direkt in Excel ändern berechnet alle Preise automatisch neu, ohne erneuten Durchlauf durchs Tool.
+
 ## [0.3.0] - 2026-08-14
 
 ### Added
