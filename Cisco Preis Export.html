@@ -1,0 +1,46 @@
+<!-- thought up by human, coded by ai -->
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'self';">
+  <title>Cisco Preis Export</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>💶</text></svg>">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <main class="app">
+    <header class="app-header">
+      <h1>Cisco Preis Export</h1>
+      <p class="app-subtitle">Cisco-Preisangebot (.xlsx) von USD in EUR umrechnen — läuft komplett im Browser, keine Daten verlassen dein Gerät.</p>
+    </header>
+
+    <section class="card">
+      <div id="drop-zone" class="drop-zone" tabindex="0" role="button" aria-label="Datei per Klick auswählen oder hierher ziehen">
+        <p class="drop-zone-text" id="drop-zone-text">Quote-Datei (.xlsx) hierher ziehen oder klicken</p>
+        <input type="file" id="file-input" accept=".xlsx" hidden>
+      </div>
+
+      <div class="field">
+        <label for="rate-input">Umrechnungskurs (USD → EUR)</label>
+        <input type="text" id="rate-input" inputmode="decimal" placeholder="z. B. 0,92" disabled>
+      </div>
+
+      <button id="process-button" class="primary-button" disabled>Verarbeiten &amp; herunterladen</button>
+
+      <p id="status" class="status" role="status" aria-live="polite"></p>
+    </section>
+
+    <footer class="app-footer">
+      <span class="app-footer-note">thought up by human, coded by ai</span>
+      <img src="assets/ai-label-dark.svg" alt="KI-generierter Inhalt" class="app-footer-ai-label app-footer-ai-label-dark">
+      <img src="assets/ai-label-light.svg" alt="KI-generierter Inhalt" class="app-footer-ai-label app-footer-ai-label-light">
+      <span class="app-footer-version" id="app-footer-version"></span>
+    </footer>
+  </main>
+
+  <script src="vendor/jszip.min.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
