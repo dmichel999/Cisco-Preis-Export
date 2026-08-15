@@ -1,7 +1,7 @@
 // thought up by human, coded by ai
 'use strict';
 
-const APP_VERSION = '0.6.0';
+const APP_VERSION = '0.7.0';
 
 const HEADER_TEXT_CREDITS = 'Credits';
 const HEADER_TEXT_CUSTOM_NAME = 'Custom Name';
@@ -471,16 +471,32 @@ function initUI() {
   const rateInput = document.getElementById('rate-input');
   const processButton = document.getElementById('process-button');
   const status = document.getElementById('status');
-  const versionEl = document.getElementById('app-footer-version');
+  const footerVersionEl = document.getElementById('app-footer-version');
+  const headerVersionEl = document.getElementById('app-header-version');
 
-  versionEl.textContent = `v${APP_VERSION}`;
+  footerVersionEl.textContent = `Version ${APP_VERSION}`;
+  if (headerVersionEl) headerVersionEl.textContent = `v${APP_VERSION}`;
+
+  bindThemeToggle();
 
   let selectedFile = null;
 
   function setStatus(message, state) {
-    status.textContent = message;
+    status.textContent = '';
     if (state) status.setAttribute('data-state', state);
     else status.removeAttribute('data-state');
+    if (!message) return;
+    if (state === 'error' || state === 'success') {
+      const icon = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+      icon.setAttribute('class', 'i');
+      const use = document.createElementNS('http://www.w3.org/2000/svg', 'use');
+      use.setAttribute('href', 'icons/icon-sprite.svg#' + (state === 'success' ? 'ic-check-circle' : 'ic-error'));
+      icon.appendChild(use);
+      status.appendChild(icon);
+    }
+    const span = document.createElement('span');
+    span.textContent = message;
+    status.appendChild(span);
   }
 
   function handleFileSelected(file) {
@@ -541,6 +557,34 @@ function initUI() {
     } finally {
       processButton.disabled = false;
     }
+  });
+}
+
+// ─── Theme toggle (Hell/Automatisch/Dunkel, wie im Bechtle Design System
+//      vorgesehen — siehe design-system/README.md "Theme-Toggle") ───────
+function bindThemeToggle() {
+  const container = document.getElementById('theme-toggle');
+  if (!container) return;
+  const buttons = container.querySelectorAll('[data-theme]');
+
+  function applyTheme(theme) {
+    buttons.forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.theme === theme)));
+    if (theme === 'auto') {
+      document.documentElement.removeAttribute('data-theme');
+    } else {
+      document.documentElement.setAttribute('data-theme', theme);
+    }
+  }
+
+  const saved = localStorage.getItem('cpe-ui-theme') || 'auto';
+  applyTheme(saved);
+
+  container.addEventListener('click', (e) => {
+    const btn = e.target.closest('[data-theme]');
+    if (!btn) return;
+    const theme = btn.dataset.theme;
+    applyTheme(theme);
+    localStorage.setItem('cpe-ui-theme', theme);
   });
 }
 

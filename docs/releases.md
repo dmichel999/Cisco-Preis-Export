@@ -2,6 +2,13 @@
 
 Format nach [Keep a Changelog](https://keepachangelog.com/de/1.0.0/), Versionierung nach [SemVer](https://semver.org/lang/de/).
 
+## [0.7.0] - 2026-08-15
+
+### Changed
+
+- Bechtle Design System (`design-system/`) ausgerollt: Appbar mit Logo/Signet und Hell/Automatisch/Dunkel-Theme-Toggle, Card-/Field-/Button-/Status-Komponenten, einheitlicher Footer (Bechtle Freiburg · Version · AI-Label). `css/style.css` enthält nur noch projektspezifische Ergänzungen (Dropzone, Status-Icons), keine rohen Farbwerte mehr.
+- Bisher rein `prefers-color-scheme`-basiertes Dark Mode ersetzt durch manuellen Theme-Toggle (`data-theme`-Attribut, persistiert in `localStorage`).
+
 ## [0.6.0] - 2026-08-14
 
 ### Added

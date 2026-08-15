@@ -1,0 +1,330 @@
+/* ==========================================================================
+   Bechtle Design System — Tokens
+   Version: 1.0.0
+   Stand: 14.08.2026
+
+   This file contains ONLY design tokens (CSS custom properties).
+   Swap this file to rebrand the entire UI.
+
+   Official Bechtle Corporate Color Palette (2024).
+   thought up by human, coded by ai
+   ========================================================================== */
+
+:root {
+  color-scheme: light dark;
+
+  /* ---------------------------------------------------------------- palette
+     Official Bechtle colors. These are the raw palette values — the semantic
+     tokens below reference these so a rebrand only touches this section.
+     ---------------------------------------------------------------- */
+
+  /* — Experience Green (deep, authoritative) — */
+  --palette-exp-green: #075033;
+  --palette-exp-green-10: #06482E;
+  --palette-exp-green-20: #064029;
+  --palette-exp-green-30: #053824;
+  --palette-exp-green-40: #04301F;
+  --palette-exp-green-50: #04281A;
+  --palette-exp-green-60: #032014;
+  --palette-exp-green-70: #02180F;
+  --palette-exp-green-80: #01100A;
+  --palette-exp-green-90: #010805;
+  --palette-exp-green--10: #206247;
+  --palette-exp-green--20: #39735C;
+  --palette-exp-green--30: #518570;
+  --palette-exp-green--40: #6A9685;
+  --palette-exp-green--50: #83A899;
+  --palette-exp-green--60: #9CB9AD;
+  --palette-exp-green--70: #B5CBC2;
+  --palette-exp-green--80: #CDDCD6;
+  --palette-exp-green--90: #E6EEEB;
+
+  /* — Progressive Green (primary interaction) — */
+  --palette-prog-green: #23A96A;
+  --palette-prog-green-10: #20986A;
+  --palette-prog-green-20: #1C8755;
+  --palette-prog-green-30: #19764A;
+  --palette-prog-green-40: #156540;
+  --palette-prog-green-50: #125535;
+  --palette-prog-green-60: #0E442A;
+  --palette-prog-green-70: #0B3320;
+  --palette-prog-green-80: #072215;
+  --palette-prog-green-90: #04110B;
+  --palette-prog-green--10: #39B279;
+  --palette-prog-green--20: #4FBA88;
+  --palette-prog-green--30: #65C397;
+  --palette-prog-green--40: #7BCBA6;
+  --palette-prog-green--50: #91D4B5;
+  --palette-prog-green--60: #A7DDC3;
+  --palette-prog-green--70: #BDE5D2;
+  --palette-prog-green--80: #D3EEE1;
+  --palette-prog-green--90: #E9F6F0;
+
+  /* — Future Green (vivid accent) — */
+  --palette-future-green: #2FFB95;
+  --palette-future-green-10: #2AE286;
+  --palette-future-green-20: #26C977;
+  --palette-future-green-30: #21B068;
+  --palette-future-green-40: #1C9759;
+  --palette-future-green-50: #187E4B;
+  --palette-future-green-60: #13643C;
+  --palette-future-green-70: #0E4B2D;
+  --palette-future-green-80: #09321E;
+  --palette-future-green-90: #05190F;
+  --palette-future-green--10: #44FBA0;
+  --palette-future-green--20: #59FCAA;
+  --palette-future-green--30: #6DFCB5;
+  --palette-future-green--40: #82FDBF;
+  --palette-future-green--50: #97FDCA;
+  --palette-future-green--60: #ACFDD5;
+  --palette-future-green--70: #C1FED5;
+  --palette-future-green--80: #D5FEEA;
+  --palette-future-green--90: #EAFFF4;
+
+  /* — Straight Blue — */
+  --palette-straight-blue: #346CEF;
+  --palette-straight-blue-10: #2F61D7;
+  --palette-straight-blue-30: #244CA7;
+  --palette-straight-blue-50: #1A3678;
+  --palette-straight-blue-70: #102048;
+  --palette-straight-blue--10: #487BF1;
+  --palette-straight-blue--30: #7198F4;
+  --palette-straight-blue--50: #9AB6F7;
+  --palette-straight-blue--70: #C2D3FA;
+  --palette-straight-blue--90: #EBF0FD;
+
+  /* — Raspberry (error/danger) — */
+  --palette-raspberry: #D9486C;
+  --palette-raspberry-30: #98324C;
+  --palette-raspberry-50: #6D2436;
+  --palette-raspberry-70: #411620;
+  --palette-raspberry--10: #DD5A7B;
+  --palette-raspberry--30: #E47F98;
+  --palette-raspberry--50: #ECA4B6;
+  --palette-raspberry--70: #F4C8D3;
+  --palette-raspberry--90: #FBEDF0;
+
+  /* — Light Orange (warning) — */
+  --palette-light-orange: #FF9C5C;
+  --palette-light-orange-30: #B36D40;
+  --palette-light-orange-50: #804E2E;
+  --palette-light-orange-70: #4D2F1C;
+  --palette-light-orange--10: #FFA66C;
+  --palette-light-orange--30: #FFB98D;
+  --palette-light-orange--50: #FFD0B1;
+  --palette-light-orange--70: #FFE1CE;
+  --palette-light-orange--90: #FFF5EF;
+
+  /* — Ghost White & Greys — */
+  --palette-ghost-white: #FAF9F6;
+  --palette-bold-grey: #4E4E4E;
+  --palette-white: #FFFFFF;
+  --palette-black: #000000;
+
+  /* --------------------------------------------------------- semantic tokens
+     Light mode (default). These are the tokens components reference.
+     Never use palette values directly in components.
+     --------------------------------------------------------- */
+
+  /* — Primary — */
+  --md-primary: #23A96A;
+  --md-on-primary: #FFFFFF;
+  --md-primary-hover: #19764A;
+  --md-primary-strong: #075033;
+  --md-primary-container: #21B068;
+  --md-on-primary-container: #FFFFFF;
+
+  /* — Surface — */
+  --md-surface: #FAF9F6;
+  --md-surface-dim: #F0EFEC;
+  --md-surface-1: #FFFFFF;
+  --md-surface-2: #E9F6F0;
+  --md-surface-3: #D3EEE1;
+  --md-on-surface: #075033;
+  --md-on-surface-variant: #4E4E4E;
+
+  /* — Outline — */
+  --md-outline: #6A9685;
+  --md-outline-variant: #CDDCD6;
+
+  /* — Error — */
+  --md-error: #D9486C;
+  --md-on-error: #FFFFFF;
+  --md-error-container: #FBEDF0;
+  --md-on-error-container: #6D2436;
+
+  /* — Success — */
+  --md-success: #23A96A;
+  --md-success-container: #E9F6F0;
+  --md-on-success-container: #075033;
+
+  /* — Warning — */
+  --md-warning: #FF9C5C;
+  --md-warning-container: #FFF5EF;
+  --md-on-warning-container: #4D2F1C;
+
+  /* — Info — */
+  --md-info: #346CEF;
+  --md-info-container: #EBF0FD;
+  --md-on-info-container: #102048;
+
+  /* ------------------------------------------------------------ shape */
+  --radius-xs: 4px;
+  --radius-s: 8px;
+  --radius-m: 12px;
+  --radius-l: 16px;
+  --radius-xl: 28px;
+  --radius-full: 9999px;
+
+  /* ------------------------------------------------------------ elevation */
+  --elev-1: 0 1px 3px rgba(7,80,51,.08), 0 1px 12px rgba(7,80,51,.06);
+  --elev-2: 0 2px 6px rgba(7,80,51,.10), 0 2px 24px rgba(7,80,51,.10);
+  --elev-3: 0 4px 12px rgba(7,80,51,.12), 0 8px 32px rgba(7,80,51,.14);
+
+  /* ------------------------------------------------------------ typography */
+  --font: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  --fs-xs: 0.75rem;
+  --fs-sm: 0.85rem;
+  --fs-base: 0.9375rem;
+  --fs-md: 1.05rem;
+  --fs-lg: 1.25rem;
+  --fs-xl: 1.5rem;
+  --lh: 1.5;
+
+  /* ------------------------------------------------------------ motion */
+  --duration-short: 120ms;
+  --duration-medium: 300ms;
+  --duration-long: 500ms;
+  --easing: cubic-bezier(0.2, 0, 0, 1);
+
+  /* ------------------------------------------------------------ layout */
+  --content-max-width: 1100px;
+  --appbar-height: 56px;
+  --footer-height: auto;
+
+  /* ------------------------------------------------------------ z-index */
+  --z-appbar: 20;
+  --z-drawer: 30;
+  --z-overlay: 40;
+  --z-toast: 60;
+  --z-dialog: 100;
+
+  /* ------------------------------------------------------------ breakpoints
+     Reference only — CSS can't use custom properties in @media queries.
+     Documented here for consistency across projects.
+     Mobile:  < 768px
+     Tablet:  768px – 1023px
+     Desktop: >= 1024px
+     Wide:    >= 1400px
+     ------------------------------------------------------------ */
+}
+
+/* ================================================================ dark mode
+   Uses deeper palette stops for surfaces, lighter stops for text/controls.
+
+   Applies automatically when the OS prefers dark (unless a manual
+   data-theme="light" override is active), AND unconditionally when a
+   project's theme toggle sets data-theme="dark" on <html> — see the
+   Theme-Toggle section in README.md. Both selectors intentionally
+   duplicate the same values so either trigger alone is sufficient.
+   ================================================================ */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    /* — Primary — */
+    --md-primary: #44FBA0;
+    --md-on-primary: #04281A;
+    --md-primary-hover: #6DFCB5;
+    --md-primary-strong: #075033;
+    --md-primary-container: #0E442A;
+    --md-on-primary-container: #C1FED5;
+
+    /* — Surface — */
+    --md-surface: #010805;
+    --md-surface-dim: #01100A;
+    --md-surface-1: #02180F;
+    --md-surface-2: #04281A;
+    --md-surface-3: #053824;
+    --md-on-surface: #E6EEEB;
+    --md-on-surface-variant: #B5CBC2;
+
+    /* — Outline — */
+    --md-outline: #83A899;
+    --md-outline-variant: #39735C;
+
+    /* — Error — */
+    --md-error: #DD5A7B;
+    --md-on-error: #411620;
+    --md-error-container: #6D2436;
+    --md-on-error-container: #F4C8D3;
+
+    /* — Success — */
+    --md-success: #44FBA0;
+    --md-success-container: #0E442A;
+    --md-on-success-container: #C1FED5;
+
+    /* — Warning — */
+    --md-warning: #FFA66C;
+    --md-warning-container: #4D2F1C;
+    --md-on-warning-container: #FFE1CE;
+
+    /* — Info — */
+    --md-info: #487BF1;
+    --md-info-container: #102048;
+    --md-on-info-container: #C2D3FA;
+
+    /* — Elevation (lighter shadow is invisible on dark, use border-like glow) — */
+    --elev-1: 0 1px 3px rgba(0,0,0,.30), 0 1px 12px rgba(0,0,0,.20);
+    --elev-2: 0 2px 6px rgba(0,0,0,.35), 0 2px 24px rgba(0,0,0,.25);
+    --elev-3: 0 4px 12px rgba(0,0,0,.40), 0 8px 32px rgba(0,0,0,.30);
+  }
+}
+
+:root[data-theme="dark"] {
+  /* — Primary — */
+  --md-primary: #44FBA0;
+  --md-on-primary: #04281A;
+  --md-primary-hover: #6DFCB5;
+  --md-primary-strong: #075033;
+  --md-primary-container: #0E442A;
+  --md-on-primary-container: #C1FED5;
+
+  /* — Surface — */
+  --md-surface: #010805;
+  --md-surface-dim: #01100A;
+  --md-surface-1: #02180F;
+  --md-surface-2: #04281A;
+  --md-surface-3: #053824;
+  --md-on-surface: #E6EEEB;
+  --md-on-surface-variant: #B5CBC2;
+
+  /* — Outline — */
+  --md-outline: #83A899;
+  --md-outline-variant: #39735C;
+
+  /* — Error — */
+  --md-error: #DD5A7B;
+  --md-on-error: #411620;
+  --md-error-container: #6D2436;
+  --md-on-error-container: #F4C8D3;
+
+  /* — Success — */
+  --md-success: #44FBA0;
+  --md-success-container: #0E442A;
+  --md-on-success-container: #C1FED5;
+
+  /* — Warning — */
+  --md-warning: #FFA66C;
+  --md-warning-container: #4D2F1C;
+  --md-on-warning-container: #FFE1CE;
+
+  /* — Info — */
+  --md-info: #487BF1;
+  --md-info-container: #102048;
+  --md-on-info-container: #C2D3FA;
+
+  /* — Elevation (lighter shadow is invisible on dark, use border-like glow) — */
+  --elev-1: 0 1px 3px rgba(0,0,0,.30), 0 1px 12px rgba(0,0,0,.20);
+  --elev-2: 0 2px 6px rgba(0,0,0,.35), 0 2px 24px rgba(0,0,0,.25);
+  --elev-3: 0 4px 12px rgba(0,0,0,.40), 0 8px 32px rgba(0,0,0,.30);
+}

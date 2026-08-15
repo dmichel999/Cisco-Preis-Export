@@ -1,186 +1,83 @@
-:root {
-  --color-bg: #f1f3f4;
-  --color-surface: #ffffff;
-  --color-text: #202124;
-  --color-text-muted: #5f6368;
-  --color-primary: #1a73e8;
-  --color-primary-contrast: #ffffff;
-  --color-border: #dadce0;
-  --color-drop-hover: #e8f0fe;
-  --color-error: #c5221f;
-  --color-success: #188038;
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --color-bg: #202124;
-    --color-surface: #2d2e30;
-    --color-text: #e8eaed;
-    --color-text-muted: #9aa0a6;
-    --color-primary: #8ab4f8;
-    --color-primary-contrast: #202124;
-    --color-border: #4a4c4f;
-    --color-drop-hover: #3c4043;
-    --color-error: #f28b82;
-    --color-success: #81c995;
-  }
-}
-
-* {
-  box-sizing: border-box;
-}
-
-body {
-  margin: 0;
-  min-height: 100vh;
-  background: var(--color-bg);
-  color: var(--color-text);
-  font-family: "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-  display: flex;
-  justify-content: center;
-  padding: 2rem 1rem;
-}
+/* ══════════════════════════════════════════════════════════════
+   TOOL-OBERFLÄCHE — ergänzt nur, was design-components.css bewusst
+   nicht abdeckt. Referenziert ausschließlich var(--md-*)/var(--radius-*)
+   -Tokens, nie rohe Werte.
+   ══════════════════════════════════════════════════════════════ */
 
 .app {
   width: 100%;
-  max-width: 640px;
+  max-width: 560px;
+  margin: 0 auto;
+  padding: clamp(16px, 4vw, 32px) clamp(12px, 3vw, 24px);
   display: flex;
   flex-direction: column;
-  gap: 1.5rem;
-}
-
-.app-header h1 {
-  margin: 0 0 0.25rem;
-  font-size: 1.6rem;
+  gap: 20px;
 }
 
 .app-subtitle {
   margin: 0;
-  color: var(--color-text-muted);
-  font-size: 0.95rem;
+  color: var(--md-on-surface-variant);
+  font-size: var(--fs-sm);
 }
 
 .card {
-  background: var(--color-surface);
-  border-radius: 12px;
-  padding: 1.5rem;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1), 0 1px 3px rgba(0, 0, 0, 0.08);
   display: flex;
   flex-direction: column;
-  gap: 1.25rem;
+  gap: 20px;
 }
 
+/* ─── Dropzone ───────────────────────────────────────────────── */
 .drop-zone {
-  border: 2px dashed var(--color-border);
-  border-radius: 10px;
-  padding: 2.5rem 1rem;
+  border: 2px dashed var(--md-outline-variant);
+  border-radius: var(--radius-m);
+  padding: clamp(24px, 6vw, 40px) 16px;
   text-align: center;
   cursor: pointer;
-  transition: background-color 0.15s ease, border-color 0.15s ease;
+  color: var(--md-on-surface-variant);
+  transition: background-color var(--duration-short) var(--easing), border-color var(--duration-short) var(--easing);
 }
-
+.drop-zone svg.i { width: 28px; height: 28px; margin-bottom: 6px; color: var(--md-on-surface-variant); }
 .drop-zone:hover,
 .drop-zone:focus-visible,
 .drop-zone.dragover {
-  background: var(--color-drop-hover);
-  border-color: var(--color-primary);
+  background: var(--md-surface-2);
+  border-color: var(--md-primary);
   outline: none;
 }
-
 .drop-zone-text {
   margin: 0;
-  color: var(--color-text-muted);
   word-break: break-word;
 }
 
-.field {
-  display: flex;
-  flex-direction: column;
-  gap: 0.4rem;
-}
+/* ─── Button (volle Breite, sonst Default-.btn aus design-components.css) ── */
+.btn-block { display: flex; width: 100%; }
 
-.field label {
-  font-size: 0.9rem;
-  color: var(--color-text-muted);
-}
-
-.field input {
-  padding: 0.6rem 0.75rem;
-  border: 1px solid var(--color-border);
-  border-radius: 6px;
-  background: var(--color-bg);
-  color: var(--color-text);
-  font-size: 1rem;
-}
-
-.field input:disabled {
-  opacity: 0.5;
-}
-
-.primary-button {
-  padding: 0.75rem 1rem;
-  border: none;
-  border-radius: 6px;
-  background: var(--color-primary);
-  color: var(--color-primary-contrast);
-  font-size: 1rem;
-  font-weight: 600;
-  cursor: pointer;
-  appearance: none;
-  -webkit-appearance: none;
-}
-
-.primary-button:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
+/* ─── Status (data-state statt fester .status-Klassen, siehe app.js) ──── */
 .status {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
   margin: 0;
   min-height: 1.2em;
-  font-size: 0.9rem;
+  font-size: var(--fs-sm);
 }
-
-.status[data-state="error"] {
-  color: var(--color-error);
-}
-
+.status svg.i { flex: none; margin-top: 1px; }
+.status[data-state="error"],
 .status[data-state="success"] {
-  color: var(--color-success);
+  padding: 10px 14px;
+  border-radius: var(--radius-m);
 }
+.status[data-state="error"] { background: var(--md-error-container); color: var(--md-on-error-container); }
+.status[data-state="success"] { background: var(--md-success-container); color: var(--md-on-success-container); }
 
-.app-footer {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  color: var(--color-text-muted);
-  font-size: 0.8rem;
-}
-
-.app-footer-note {
-  flex: 1;
-}
-
-.app-footer-ai-label {
-  height: 20px;
-  width: auto;
-  display: block;
-}
-
-.app-footer-ai-label-light {
-  display: none;
-}
-
+/* ─── AI-Label Light/Dark-Umschaltung (design-components.css definiert
+   nur die Größe, nicht die Theme-Umschaltung — siehe README.md "AI-Label") ── */
+.ai-label-dark { display: none; }
 @media (prefers-color-scheme: dark) {
-  .app-footer-ai-label-dark {
-    display: none;
-  }
-
-  .app-footer-ai-label-light {
-    display: block;
-  }
+  :root:not([data-theme="light"]) .ai-label-light { display: none; }
+  :root:not([data-theme="light"]) .ai-label-dark { display: inline; }
 }
-
-.app-footer-version {
-  white-space: nowrap;
-}
+:root[data-theme="dark"] .ai-label-light { display: none; }
+:root[data-theme="dark"] .ai-label-dark { display: inline; }
+:root[data-theme="light"] .ai-label-light { display: inline; }
+:root[data-theme="light"] .ai-label-dark { display: none; }

@@ -7,38 +7,64 @@
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'self';">
   <title>Cisco Preis Export</title>
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>💶</text></svg>">
+  <link rel="stylesheet" href="css/design-tokens.css">
+  <link rel="stylesheet" href="css/design-components.css">
   <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
-  <main class="app">
-    <header class="app-header">
-      <h1>Cisco Preis Export</h1>
-      <p class="app-subtitle">Cisco-Preisangebot (.xlsx) von USD in EUR umrechnen — läuft komplett im Browser, keine Daten verlassen dein Gerät.</p>
-    </header>
+  <header class="appbar">
+    <img src="assets/bechtle-signet.svg" alt="" class="logo-signet">
+    <img src="assets/bechtle-logo.svg" alt="Bechtle" class="logo-landscape">
+    <h1>Cisco Preis Export</h1>
+    <div class="spacer"></div>
+    <span class="badge hide-mobile" id="app-header-version"></span>
+    <div class="theme-toggle" id="theme-toggle">
+      <button aria-label="Hell" aria-pressed="false" data-theme="light">
+        <svg class="i"><use href="icons/icon-sprite.svg#ic-light-mode"></use></svg>
+      </button>
+      <button aria-label="Automatisch" aria-pressed="true" data-theme="auto">
+        <svg class="i"><use href="icons/icon-sprite.svg#ic-auto-mode"></use></svg>
+      </button>
+      <button aria-label="Dunkel" aria-pressed="false" data-theme="dark">
+        <svg class="i"><use href="icons/icon-sprite.svg#ic-dark-mode"></use></svg>
+      </button>
+    </div>
+  </header>
 
-    <section class="card">
+  <main class="app">
+    <p class="app-subtitle">Cisco-Preisangebot (.xlsx) von USD in EUR umrechnen — läuft komplett im Browser, keine Daten verlassen dein Gerät.</p>
+
+    <div class="card">
       <div id="drop-zone" class="drop-zone" tabindex="0" role="button" aria-label="Datei per Klick auswählen oder hierher ziehen">
+        <svg class="i"><use href="icons/icon-sprite.svg#ic-upload"></use></svg>
         <p class="drop-zone-text" id="drop-zone-text">Quote-Datei (.xlsx) hierher ziehen oder klicken</p>
         <input type="file" id="file-input" accept=".xlsx" hidden>
       </div>
 
-      <div class="field">
-        <label for="rate-input">Wechselkurs (USD pro EUR, z. B. Cisco-Dealkurs)</label>
-        <input type="text" id="rate-input" inputmode="decimal" placeholder="z. B. 1,08" disabled>
-      </div>
+      <label class="field">
+        <input type="text" id="rate-input" inputmode="decimal" placeholder=" " disabled>
+        <label>Wechselkurs (USD pro EUR, z. B. Cisco-Dealkurs)</label>
+      </label>
 
-      <button id="process-button" class="primary-button" disabled>Verarbeiten &amp; herunterladen</button>
+      <button id="process-button" class="btn-block" disabled>
+        <svg class="i"><use href="icons/icon-sprite.svg#ic-download"></use></svg> Verarbeiten &amp; herunterladen
+      </button>
 
       <p id="status" class="status" role="status" aria-live="polite"></p>
-    </section>
-
-    <footer class="app-footer">
-      <span class="app-footer-note">thought up by human, coded by ai</span>
-      <img src="assets/ai-label-dark.svg" alt="KI-generierter Inhalt" class="app-footer-ai-label app-footer-ai-label-dark">
-      <img src="assets/ai-label-light.svg" alt="KI-generierter Inhalt" class="app-footer-ai-label app-footer-ai-label-light">
-      <span class="app-footer-version" id="app-footer-version"></span>
-    </footer>
+    </div>
   </main>
+
+  <footer>
+    <span class="footer-brand">Bechtle Freiburg</span>
+    <span class="footer-divider">&middot;</span>
+    <span class="footer-version" id="app-footer-version"></span>
+    <span class="footer-divider">&middot;</span>
+    <span class="footer-sig">
+      thought up by human, coded by ai
+      <img src="assets/ai-label-light.svg" alt="KI-generierter Inhalt" class="ai-label ai-label-light">
+      <img src="assets/ai-label-dark.svg" alt="KI-generierter Inhalt" class="ai-label ai-label-dark">
+    </span>
+  </footer>
 
   <script src="vendor/jszip.min.js"></script>
   <script src="js/app.js"></script>
