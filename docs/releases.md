@@ -2,6 +2,13 @@
 
 Format nach [Keep a Changelog](https://keepachangelog.com/de/1.0.0/), Versionierung nach [SemVer](https://semver.org/lang/de/).
 
+## [0.8.0] - 2026-09-15
+
+### Fixed
+
+- Neue Spalte "Price EUR" landete bisher hartkodiert direkt in "Custom Name"-Spalte + 1. Neuere Cisco-Quote-Exporte enthalten dort inzwischen eine zusätzliche, befüllte Spalte ("BPA No Subscription Line") — die neue Preis-Spalte kollidierte mit doppelten Zellreferenzen in derselben Zeile, wodurch Excel die Preise verwarf/ignorierte ("Preise werden nicht mehr eingetragen"). Die Zielspalte wird jetzt zur Laufzeit als erste tatsächlich freie Spalte ermittelt (geprüft über Kopfzeile, Kurs-/Datumszeile und alle Datenzeilen) statt per fester Positionsannahme.
+- Erfolgsmeldung nannte immer hartkodiert "AF39" als Kurszelle, unabhängig davon, wo die Zelle tatsächlich landete. Wird jetzt aus der tatsächlich berechneten Zellreferenz gebaut.
+
 ## [0.7.0] - 2026-08-15
 
 ### Changed

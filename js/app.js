@@ -1,7 +1,7 @@
 // thought up by human, coded by ai
 'use strict';
 
-const APP_VERSION = '0.7.0';
+const APP_VERSION = '0.8.0';
 
 const HEADER_TEXT_CREDITS = 'Credits';
 const HEADER_TEXT_CUSTOM_NAME = 'Custom Name';
@@ -70,6 +70,25 @@ function bumpRowSpans(rowEl, newColIndex) {
   if (!m) return;
   const end = Math.max(parseInt(m[2], 10), newColIndex);
   rowEl.setAttribute('spans', `${m[1]}:${end}`);
+}
+
+function isColumnOccupied(rowEl, colIndex) {
+  if (!rowEl) return false;
+  for (const c of rowEl.getElementsByTagName('c')) {
+    const ref = parseCellRef(c.getAttribute('r'));
+    if (ref && ref.colIndex === colIndex) return true;
+  }
+  return false;
+}
+
+// Cisco can add extra columns between portal versions without changing the header
+// texts we key off of (e.g. a "BPA No Subscription Line" column right after "Custom
+// Name" that didn't exist before) — probing for a column that's free across every
+// row we're about to touch avoids silently colliding with existing data there.
+function findFirstFreeColumn(startCol, rowEls) {
+  let col = startCol;
+  while (rowEls.some((rowEl) => isColumnOccupied(rowEl, col))) col++;
+  return col;
 }
 
 function roundToCents(value) {
@@ -297,7 +316,27 @@ async function processFile(file, rate) {
 
   const NS = sheetDoc.documentElement.namespaceURI;
   const sheetDataEl = sheetDoc.getElementsByTagName('sheetData')[0];
-  const newColIndex = customNameCol + 1;
+
+  // Rate row directly above the header row (e.g. row 39 when the header is row 40).
+  const rateRow =
+    headerRow.previousElementSibling && headerRow.previousElementSibling.tagName === 'row'
+      ? headerRow.previousElementSibling
+      : null;
+  const dateRowNum = rateRow ? parseInt(rateRow.getAttribute('r'), 10) - 1 : null;
+  // Sparse XML omits empty rows, so this row (e.g. the date note row) may not exist yet.
+  const existingDateRow =
+    dateRowNum == null
+      ? null
+      : Array.from(sheetDataEl.getElementsByTagName('row')).find(
+          (row) => parseInt(row.getAttribute('r'), 10) === dateRowNum
+        );
+
+  const newColIndex = findFirstFreeColumn(customNameCol + 1, [
+    headerRow,
+    rateRow,
+    existingDateRow,
+    ...dataRows.map((d) => d.row),
+  ]);
   const newColLetters = colIndexToLetters(newColIndex);
 
   const creditsHeaderCell = Array.from(headerRow.getElementsByTagName('c')).find(
@@ -316,9 +355,8 @@ async function processFile(file, rate) {
   // Stored as a plain number (custom number format only adds a display label) so
   // it can be edited in Excel and referenced by the price formulas below — editing
   // it there recalculates every price automatically, no re-upload needed.
-  const rateRow = headerRow.previousElementSibling;
   let rateCellRef = null;
-  if (rateRow && rateRow.tagName === 'row') {
+  if (rateRow) {
     const rateRowNum = rateRow.getAttribute('r');
     rateCellRef = `$${newColLetters}$${rateRowNum}`;
     const rateCell = sheetDoc.createElementNS(NS, 'c');
@@ -334,11 +372,8 @@ async function processFile(file, rate) {
   // Date note two rows above the header (e.g. AF38) so it's clear how current the
   // rate is. That row is often entirely empty in the source file (sparse XML omits
   // empty rows), so it may need to be created rather than just appended to.
-  if (rateRow && rateRow.tagName === 'row') {
-    const dateRowNum = parseInt(rateRow.getAttribute('r'), 10) - 1;
-    let dateRow = Array.from(sheetDataEl.getElementsByTagName('row')).find(
-      (row) => parseInt(row.getAttribute('r'), 10) === dateRowNum
-    );
+  if (rateRow) {
+    let dateRow = existingDateRow;
     if (!dateRow) {
       dateRow = sheetDoc.createElementNS(NS, 'row');
       dateRow.setAttribute('r', String(dateRowNum));
@@ -425,11 +460,12 @@ async function processFile(file, rate) {
   // directory entries that aren't present in the original file.
   zip.file(sheetPath, serializeWithDeclaration(sheetDoc), { createFolders: false });
 
-  return zip.generateAsync({
+  const blob = await zip.generateAsync({
     type: 'blob',
     mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
     compression: 'DEFLATE',
   });
+  return { blob, rateCellRef };
 }
 
 async function downloadResult(blob, filename) {
@@ -540,16 +576,16 @@ function initUI() {
         throw new Error('Bitte einen gültigen, positiven Umrechnungskurs eingeben.');
       }
       setStatus('Verarbeite Datei…', null);
-      const blob = await processFile(selectedFile, rate);
+      const { blob, rateCellRef } = await processFile(selectedFile, rate);
       setStatus('Speichere Datei…', null);
       const result = await downloadResult(blob, selectedFile.name);
       if (result === 'cancelled') {
         setStatus('Speichern abgebrochen.', null);
       } else {
-        setStatus(
-          `Fertig — Spalte "${NEW_COLUMN_HEADER}" mit Kurs ${rate} ergänzt. Kurs in AF39 anpassen berechnet alle Preise in Excel automatisch neu.`,
-          'success'
-        );
+        const rateHint = rateCellRef
+          ? ` Kurs in ${rateCellRef.replace(/\$/g, '')} anpassen berechnet alle Preise in Excel automatisch neu.`
+          : '';
+        setStatus(`Fertig — Spalte "${NEW_COLUMN_HEADER}" mit Kurs ${rate} ergänzt.${rateHint}`, 'success');
       }
     } catch (err) {
       console.error(err);
