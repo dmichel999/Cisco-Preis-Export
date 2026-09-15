@@ -2,6 +2,12 @@
 
 Format nach [Keep a Changelog](https://keepachangelog.com/de/1.0.0/), Versionierung nach [SemVer](https://semver.org/lang/de/).
 
+## [0.9.0] - 2026-09-15
+
+### Changed
+
+- Ausblende-Bereich reicht jetzt bis zur Spalte direkt vor "Price EUR" (nicht mehr nur bis "Custom Name"). Dadurch verschwinden auch neu von Cisco eingefügte Zwischenspalten (z. B. "BPA No Subscription Line", siehe 0.8.0), und die EUR-Spalte folgt visuell direkt auf die USD-Preisspalte.
+
 ## [0.8.0] - 2026-09-15
 
 ### Fixed

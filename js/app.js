@@ -1,7 +1,7 @@
 // thought up by human, coded by ai
 'use strict';
 
-const APP_VERSION = '0.8.0';
+const APP_VERSION = '0.9.0';
 
 const HEADER_TEXT_CREDITS = 'Credits';
 const HEADER_TEXT_CUSTOM_NAME = 'Custom Name';
@@ -426,7 +426,11 @@ async function processFile(file, rate) {
     bumpRowSpans(row, newColIndex);
   }
 
-  // Hide Credits..Custom Name columns
+  // Hide every column between "Credits" and the new "Price EUR" column — not just
+  // up to "Custom Name" — so any extra columns Cisco has inserted in between (e.g.
+  // "BPA No Subscription Line", which is why newColIndex may sit past customNameCol
+  // + 1 in the first place, see findFirstFreeColumn) disappear too and the EUR price
+  // visually follows right after the USD price column.
   let colsEl = sheetDoc.getElementsByTagName('cols')[0];
   if (!colsEl) {
     colsEl = sheetDoc.createElementNS(NS, 'cols');
@@ -434,7 +438,7 @@ async function processFile(file, rate) {
   }
   const hideCol = sheetDoc.createElementNS(NS, 'col');
   hideCol.setAttribute('min', String(creditsCol));
-  hideCol.setAttribute('max', String(customNameCol));
+  hideCol.setAttribute('max', String(newColIndex - 1));
   hideCol.setAttribute('width', '9.140625');
   hideCol.setAttribute('customWidth', '1');
   hideCol.setAttribute('hidden', '1');
