@@ -2,52 +2,9 @@
 
 Format nach [Keep a Changelog](https://keepachangelog.com/de/1.0.0/), Versionierung nach [SemVer](https://semver.org/lang/de/).
 
-## [0.16.0] - 2026-09-18
+## Revert auf v0.9.0 - 2026-09-18
 
-### Changed
-
-- **Klargestellt (0.12.0):** Die Haupt-Spalte "Price EUR" berechnet sich für **jede** Zeile weiterhin aus "Unit Net Price Before Credits" (auch 0,00 €, wenn dort `"--"` steht) — das war durch den 0.12.0-Fix versehentlich für Subscription-Zeilen auf "Unit List Price" umgestellt worden. "Unit List Price" wird jetzt ausschließlich für den Y-Wert im Subscription-Hinweistext verwendet ("Der Einzelpreis pro X Monate = Y"), unabhängig vom Wert in der "Price EUR"-Spalte.
-
-## [0.15.0] - 2026-09-18
-
-### Changed
-
-- **Zurückgenommen (0.11.0):** Zeilen ohne verwertbaren Preis (Quellzelle fehlt, ist Text wie `"--"`, oder ist exakt 0) bekommen wieder eine "Price EUR"-Zelle, jetzt mit `0,00 €` statt komplett ausgelassen zu werden — wie im Verhalten vor den Preisspalten-Fixes dieser Woche. Betrifft auch die Subscription-Hinweis-Spalte: Eine Subscription-Zeile mit Preis `0,00 €` bekommt jetzt ebenfalls ihren Hinweistext ("Der Einzelpreis pro X Monate = 0,00 €"). Nur Zeilen ganz ohne Quellzelle (z. B. eine reine "Requested Start Date"-Notizzeile) bekommen weiterhin keine Formel, sondern einen festen `0,00 €`-Wert ohne Bezug.
-
-## [0.14.0] - 2026-09-18
-
-### Fixed
-
-- Excel zeigte bei manchen Quotes "Wir haben ein Problem bei einigen Inhalten erkannt. Sollen wir so viel wie möglich wiederherstellen?" beim Öffnen der erzeugten Datei. Ursache: Neue `<c>`-Zellen wurden per `appendChild` immer als letztes Element einer `<row>` angehängt — bei Quotes mit vorhandenen Spalten *nach* der neuen Preis-Spalte (z. B. eine bereits vorhandene Berechnungsspalte hinter "Custom Name") verletzte das die von OOXML verlangte aufsteigende Spaltenreihenfolge innerhalb einer Zeile. Neue Zellen werden jetzt an der korrekten sortierten Position eingefügt (`insertCellInOrder`).
-
-## [0.13.0] - 2026-09-18
-
-### Added
-
-- Klare Fehlermeldung, wenn eine bereits verarbeitete Datei (mit existierender "Price EUR"-Spalte) erneut hochgeladen wird, statt stillschweigend eine zweite, kollidierende "Price EUR"-Spalte danebenzusetzen. Bitte immer die ursprüngliche, unveränderte Cisco-Quote verarbeiten, nie eine bereits erzeugte Ausgabedatei.
-
-## [0.12.0] - 2026-09-18
-
-### Fixed
-
-- Subscription-Zeilen (Pricing Term > 0) verwenden jetzt "Unit List Price" als Quellpreis statt "Unit Net Price Before Credits" — Cisco trägt bei Subscription-Lizenzen in letzterer Spalte nur `"--"` ein (der Netto-Preis pro Transaktion ist dort nicht aussagekräftig), den eigentlichen Lizenzpreis liefert "Unit List Price". Nicht-Subscription-Zeilen nutzen weiterhin "Unit Net Price Before Credits" wie bisher.
-- `resolveCellText` gab für Zellen ohne `t`-Attribut (reine Zahl, z. B. "Pricing Term (in Months)" als echte Zahl statt Shared-String) `null` zurück. Dadurch wurden reale Subscription-Zeilen fälschlich als "keine Subscription" (Term = 0) erkannt, weil ihr numerischer Term-Wert nicht ausgelesen werden konnte. Betrifft auch die "Part Number"-Tabellenende-Erkennung, falls Part Numbers rein numerisch sind.
-
-## [0.11.0] - 2026-09-18
-
-### Fixed
-
-- Echte Quotes können in "Unit Net Price Before Credits" einen Text-Platzhalter (`"--"`) statt einer Zahl enthalten (z. B. Bundle-Kindzeilen ohne eigenen Preis) — das ließ das Tool bisher sofort mit "Keine Artikelzeilen unterhalb der Kopfzeile gefunden" abbrechen, weil die erste nicht-numerische Quellzelle fälschlich als Tabellenende galt. Das Tabellenende wird jetzt stattdessen über die Spalte "Part Number" erkannt (neuer Pflicht-Ankertext); eine fehlende/textuelle/exakt-0 Quellzelle bedeutet nur noch "kein Preis für diese Zeile", nicht mehr "Ende der Tabelle".
-
-### Changed
-
-- Zeilen ohne verwertbaren Preis (Quellzelle fehlt, ist Text wie `"--"`, oder ist exakt 0) bekommen jetzt gar keine "Price EUR"-Zelle (statt vorher `0,00 €` bzw. Abbruch) — für sie wird nichts eingetragen, auch keine Subscription-Hinweis-Zelle.
-
-## [0.10.0] - 2026-09-18
-
-### Added
-
-- Subscription-Zeilen (erkennbar an "Pricing Term (in Months)" > 0) bekommen eine zusätzliche Spalte "Preishinweis" mit dem Text "Der Einzelpreis pro X Monate = Y" (X = Pricing Term, Y = berechneter EUR-Preis der Zeile). Eigene Spalte statt Text in der "Price EUR"-Zelle selbst, damit deren Formel/Live-Neuberechnung bei Kursänderung erhalten bleibt (siehe docs/architecture.md).
+Alle Änderungen aus den Versionen 0.10.0–0.16.0 (Subscription-Hinweis-Spalte, "Part Number"-Tabellenende-Erkennung, "Unit List Price"-Umschaltung, Zell-Reihenfolge-Fix, "bereits verarbeitet"-Prüfung) wurden vollständig zurückgenommen — sie funktionierten in der Praxis nicht zuverlässig. `js/app.js` und die Doku entsprechen wieder exakt dem Stand von v0.9.0.
 
 ## [0.9.0] - 2026-09-15
 

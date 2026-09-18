@@ -15,33 +15,13 @@
 
 Alle anderen Dateien im ZIP (`sharedStrings.xml`, Merged-Cell-Definitionen, Themes, etc.) bleiben byteidentisch zum Original. Dadurch bleibt die Formatierung garantiert erhalten — es wird nichts "nachgebaut", nur gezielt ergänzt.
 
-### Neue Zellen müssen an sortierter Position eingefügt werden, nicht angehängt
-
-OOXML verlangt, dass `<c>`-Elemente innerhalb einer `<row>` in aufsteigender Spaltenreihenfolge stehen. Bis v0.13.0 wurden neue Zellen per `rowEl.appendChild(cell)` immer als letztes Element eingefügt — das brach bei Quotes, die *nach* der neu eingefügten Spalte noch weitere, bereits vorhandene Spalten mit Inhalt haben (z. B. eine Cisco-eigene Berechnungsspalte hinter "Custom Name", siehe "BPA No Subscription Line"/`findFirstFreeColumn`). Excel zeigte dann beim Öffnen den Reparieren-Dialog ("Wir haben ein Problem bei einigen Inhalten erkannt").
-
-Seit v0.14.0 übernimmt `insertCellInOrder(rowEl, cellEl, colIndex)` das Einfügen: Es sucht die erste vorhandene Zelle mit größerem Spaltenindex und fügt per `insertBefore` davor ein, statt blind anzuhängen. Jede Stelle, die eine neue `<c>`-Zelle in eine bestehende `<row>` einfügt (Kurs-Zelle, Datums-Zelle, Kopfzellen, Preis-Datenzellen, Preishinweis-Zellen), muss diese Funktion verwenden statt `appendChild`.
-
 ## Spalten-/Zeilenerkennung: Text-basiert, nicht Buchstaben-basiert
 
 Im aktuell bekannten Export-Format sind die Spalten "Credits" bis "Custom Name" P–AE und die Quellspalte "Unit Net Price Before Credits" ist O. Diese Buchstaben werden **nicht** hartkodiert, sondern zur Laufzeit über die Kopfzeilen-Zelltexte ermittelt:
 
 1. Suche die Zeile, die eine Zelle mit Text "Credits" enthält → Kopfzeile.
-2. Innerhalb dieser Zeile: Spalte von "Credits" (Start Ausblende-Bereich), Spalte von "Custom Name" (Ende Ausblende-Bereich, zugleich letzte Bestandsspalte), Spalte von "Unit Net Price Before Credits" (Quellwert für Umrechnung), Spalte von "Part Number" (Tabellenende-Anker, siehe unten).
-3. Datenzeilen = alle Zeilen direkt nach der Kopfzeile, solange sie in der Spalte "Part Number" einen nicht-leeren Wert haben. Die erste Zeile mit leerer "Part Number"-Zelle (z. B. Übergang zu "Adjustments"/"Note"-Abschnitt) beendet die Tabelle.
-
-### Tabellenende: "Part Number" statt "erste nicht-numerische Quellzelle"
-
-Bis v0.10.0 galt die erste Zeile ohne reinen Zahlenwert in der Quellspalte ("Unit Net Price Before Credits") als Tabellenende. Das brach im September 2026 an echten Quotes: Cisco schreibt für Zeilen ohne eigenen Preis (z. B. Kindzeilen eines Bundles, deren Preis in der Bundle-Zeile steckt) dort einen Text-Platzhalter (`"--"`) statt eine `0` oder eine leere Zelle — die allererste solche Zeile ließ das Tool sofort mit "Keine Artikelzeilen gefunden" abbrechen, obwohl danach noch reguläre Artikelzeilen folgten (in dem konkreten Fall sogar ausschließlich solche Zeilen, siehe Release 0.11.0).
-
-Das Tabellenende wird seit v0.11.0 stattdessen über die Spalte "Part Number" erkannt — jede echte Artikelzeile (auch eine ohne eigenen Preis) hat dort einen Wert, während Zeilen jenseits der Tabelle (Leerzeilen, "Note"-Zeile, AGB-Text) dort leer sind. Eine fehlende, textuelle oder exakt-`0`-Quellzelle bedeutet dadurch nur noch "Preis für diese Zeile ist 0" (der Wert fällt seit v0.15.0 auf `0` zurück statt die Zelle ganz auszulassen), nicht mehr "Ende der Tabelle". Nur eine Zeile ganz ohne Quellzelle (kein `sourceCell`, z. B. eine reine Notizzeile ohne eigene Preisspalte) bekommt ihren `0,00 €`-Wert ohne Formelbezug — jede Zeile mit einer Quellzelle bekommt weiterhin die Live-Formel, auch wenn deren Ergebnis 0 ist.
-
-### "Unit List Price" nur für den Subscription-Hinweistext, nicht für die Haupt-Preis-Spalte
-
-Die Haupt-Spalte "Price EUR" berechnet sich **immer** aus "Unit Net Price Before Credits" — für jede Zeile, auch wenn Cisco dort für Subscription-Lizenzen nur den Platzhalter `"--"` einträgt (dann wird der Wert 0). v0.12.0 hatte versucht, die Quellspalte pro Zeile umzuschalten (`pricingTermMonths > 0` → "Unit List Price" statt "Unit Net Price Before Credits") — das wurde in v0.16.0 zurückgenommen, weil die Haupt-Spalte weiterhin konsistent "Unit Net Price Before Credits" abbilden soll.
-
-"Unit List Price" (optionale Ankertext-Spalte, wie "Pricing Term") wird stattdessen ausschließlich für den Y-Wert im Subscription-Hinweistext verwendet ("Der Einzelpreis pro X Monate = Y") — der tatsächliche Lizenzpreis pro Abrechnungszeitraum steht dort, nicht in "Unit Net Price Before Credits" (das ist für eine Lizenz mit Laufzeit kein aussagekräftiger Netto-Transaktionspreis). Y kann sich deshalb bewusst vom Wert in "Price EUR" unterscheiden — beide Spalten bilden unterschiedliche Cisco-Preisfelder ab. `dataRows` führt dafür `value` (aus "Unit Net Price Before Credits", für "Price EUR") und `listPriceValue` (aus "Unit List Price", nur für den Hinweistext) getrennt.
-
-**Stolperfalle beim Pricing-Term-Auslesen:** "Pricing Term (in Months)" ist in echten Exporten mal ein Shared-String (oft mit einem *leeren* String — "kein Term gesetzt", kein numerischer Fallback), mal eine reine Zahl (`t`-Attribut fehlt komplett). `resolveCellText` deckte den letzteren Fall bis v0.12.0 nicht ab (gab `null` zurück) — ein rein numerischer Zellwert ohne `t`-Attribut wird jetzt ebenfalls über `<v>` aufgelöst statt fälschlich als "kein Wert" zu gelten. Das betrifft auch die "Part Number"-Erkennung, falls eine Part Number rein numerisch wäre.
+2. Innerhalb dieser Zeile: Spalte von "Credits" (Start Ausblende-Bereich), Spalte von "Custom Name" (Ende Ausblende-Bereich, zugleich letzte Bestandsspalte), Spalte von "Unit Net Price Before Credits" (Quellwert für Umrechnung).
+3. Datenzeilen = alle Zeilen direkt nach der Kopfzeile, solange sie in der Quellspalte einen reinen Zahlenwert (kein Text) enthalten. Das erste Fehlen (z. B. Übergang zu "Adjustments"/"Note"-Abschnitt) beendet die Tabelle.
 
 Kurs- und Datumszeile werden relativ zur Kopfzeile adressiert (`previousElementSibling`, bzw. dessen Zeilennummer − 1), nicht über feste Zeilennummern — funktioniert auch, wenn der Header in einer anderen Quote-Datei in einer anderen Zeile liegt.
 
@@ -74,10 +54,6 @@ Statt eines fest berechneten Werts bekommt jede Preiszeile eine echte Formel: `<
 ## Kein Cent-Rundungsfehler durch Gleitkomma
 
 Der Kurs wird als **USD pro EUR** verstanden (Cisco-Dealkurse werden so angegeben, z. B. `1.08`) — der USD-Preis wird also durch den Kurs geteilt, nicht multipliziert. Rundung erfolgt über `Math.round(value * 100) / 100` auf den bereits geteilten Wert — kaufmännische Rundung auf 2 Nachkommastellen, wie in der Quelltabelle (Format `#,##0.00`) üblich.
-
-## Subscription-Hinweis: eigene Spalte statt Text in der Preis-Zelle
-
-Der Hinweistext für Subscription-Zeilen ("Der Einzelpreis pro X Monate = Y") landet bewusst in einer eigenen Spalte rechts neben "Price EUR", nicht in derselben Zelle. Die "Price EUR"-Zelle trägt eine echte Formel (siehe "Live-Neuberechnung" oben) — würde man dort zusätzlich Text anhängen, müsste die Zelle zu einem festen `inlineStr`-Textwert werden und die Formel (und damit die automatische Neuberechnung bei Kursänderung) ginge für genau diese Zeilen verloren. Die neue Spalte wird wie "Price EUR" per `findFirstFreeColumn` ermittelt (ausgehend von der Spalte direkt nach "Price EUR"), damit sie nicht mit weiteren, künftig von Cisco eingefügten Spalten kollidiert. Sie entsteht nur, wenn mindestens eine Zeile der Quote tatsächlich eine Subscription-Lizenz ist (`"Pricing Term (in Months)"` > 0) — ist die Spalte "Pricing Term (in Months)" im Export gar nicht vorhanden, bleibt das Feature ein stiller No-op statt eines Fehlers (siehe Spaltenerkennung oben).
 
 ## Download: Overwrite-Semantik
 
