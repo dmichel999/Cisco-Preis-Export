@@ -2,6 +2,12 @@
 
 Format nach [Keep a Changelog](https://keepachangelog.com/de/1.0.0/), Versionierung nach [SemVer](https://semver.org/lang/de/).
 
+## [0.16.0] - 2026-09-18
+
+### Changed
+
+- **Klargestellt (0.12.0):** Die Haupt-Spalte "Price EUR" berechnet sich für **jede** Zeile weiterhin aus "Unit Net Price Before Credits" (auch 0,00 €, wenn dort `"--"` steht) — das war durch den 0.12.0-Fix versehentlich für Subscription-Zeilen auf "Unit List Price" umgestellt worden. "Unit List Price" wird jetzt ausschließlich für den Y-Wert im Subscription-Hinweistext verwendet ("Der Einzelpreis pro X Monate = Y"), unabhängig vom Wert in der "Price EUR"-Spalte.
+
 ## [0.15.0] - 2026-09-18
 
 ### Changed

@@ -1,7 +1,7 @@
 // thought up by human, coded by ai
 'use strict';
 
-const APP_VERSION = '0.15.0';
+const APP_VERSION = '0.16.0';
 
 const HEADER_TEXT_CREDITS = 'Credits';
 const HEADER_TEXT_CUSTOM_NAME = 'Custom Name';
@@ -274,23 +274,33 @@ function findQuoteTable(sheetDoc, sharedStrings) {
     const parsedTerm = pricingTermText ? parseFloat(pricingTermText) : NaN;
     const pricingTermMonths = Number.isNaN(parsedTerm) ? 0 : parsedTerm;
 
-    // Subscription lines carry their real price in "Unit List Price", not
-    // "Unit Net Price Before Credits" (which Cisco leaves as "--" for them —
-    // that price is a per-transaction net price, not meaningful per license).
-    const priceCell = pricingTermMonths > 0 && listPriceCell ? listPriceCell : sourceCell;
-
-    // Every item row gets a Price EUR value, even 0,00 — a missing/textual
-    // source price (e.g. Cisco's "--" placeholder) just defaults to 0.
+    // Main "Price EUR" column: always from "Unit Net Price Before Credits",
+    // for every item row, even 0,00 — a missing/textual source price (e.g.
+    // Cisco's "--" placeholder) just defaults to 0.
     let value = 0;
-    if (priceCell && !priceCell.getAttribute('t')) {
-      const vEl = priceCell.getElementsByTagName('v')[0];
+    if (sourceCell && !sourceCell.getAttribute('t')) {
+      const vEl = sourceCell.getElementsByTagName('v')[0];
       if (vEl) {
         const parsed = parseFloat(vEl.textContent);
         if (!Number.isNaN(parsed)) value = parsed;
       }
     }
 
-    dataRows.push({ row, value, sourceCell: priceCell, pricingTermMonths });
+    // Subscription note text separately uses "Unit List Price" — Cisco leaves
+    // "Unit Net Price Before Credits" as "--" for subscription lines (that
+    // price is a per-transaction net price, not meaningful per license), so
+    // the per-license price shown in the note has to come from a different
+    // column. This does not affect the main "Price EUR" value above.
+    let listPriceValue = 0;
+    if (listPriceCell && !listPriceCell.getAttribute('t')) {
+      const vEl = listPriceCell.getElementsByTagName('v')[0];
+      if (vEl) {
+        const parsed = parseFloat(vEl.textContent);
+        if (!Number.isNaN(parsed)) listPriceValue = parsed;
+      }
+    }
+
+    dataRows.push({ row, value, sourceCell, listPriceValue, pricingTermMonths });
   }
   if (dataRows.length === 0) {
     throw new Error('Keine Artikelzeilen unterhalb der Kopfzeile gefunden.');
@@ -498,7 +508,6 @@ async function processFile(file, rate) {
   for (const dataRow of dataRows) {
     const { row, value, sourceCell } = dataRow;
     const eur = roundToCents(value / rate);
-    dataRow.eur = eur; // reused below for the subscription note column
     const cell = sheetDoc.createElementNS(NS, 'c');
     cell.setAttribute('r', `${newColLetters}${row.getAttribute('r')}`);
     cell.setAttribute('s', yellowDataStyle);
@@ -518,7 +527,7 @@ async function processFile(file, rate) {
   // line. The note has to live in its own column rather than inside the "Price EUR"
   // cell itself: that cell holds a live formula (see above), and turning it into a
   // text string there would silently kill the auto-recalculation on rate changes.
-  const subscriptionRows = dataRows.filter((d) => d.pricingTermMonths > 0 && d.eur != null);
+  const subscriptionRows = dataRows.filter((d) => d.pricingTermMonths > 0);
   let noteColIndex = null;
   if (subscriptionRows.length > 0) {
     noteColIndex = findFirstFreeColumn(newColIndex + 1, [
@@ -541,9 +550,10 @@ async function processFile(file, rate) {
     insertCellInOrder(headerRow, noteHeaderCell, noteColIndex);
     bumpRowSpans(headerRow, noteColIndex);
 
-    for (const { row, eur, pricingTermMonths } of subscriptionRows) {
+    for (const { row, listPriceValue, pricingTermMonths } of subscriptionRows) {
       const months = Math.round(pricingTermMonths);
-      const eurFormatted = `${eur.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €`;
+      const noteEur = roundToCents(listPriceValue / rate);
+      const eurFormatted = `${noteEur.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €`;
       const noteCell = sheetDoc.createElementNS(NS, 'c');
       noteCell.setAttribute('r', `${noteColLetters}${row.getAttribute('r')}`);
       noteCell.setAttribute('s', rateStyleId);
