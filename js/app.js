@@ -1,11 +1,12 @@
 // thought up by human, coded by ai
 'use strict';
 
-const APP_VERSION = '0.10.0';
+const APP_VERSION = '0.11.0';
 
 const HEADER_TEXT_CREDITS = 'Credits';
 const HEADER_TEXT_CUSTOM_NAME = 'Custom Name';
 const HEADER_TEXT_SOURCE_PRICE = 'Unit Net Price Before Credits';
+const HEADER_TEXT_PART_NUMBER = 'Part Number';
 const HEADER_TEXT_PRICING_TERM = 'Pricing Term (in Months)';
 const NEW_COLUMN_HEADER = 'Price EUR';
 const SUBSCRIPTION_NOTE_HEADER = 'Preishinweis';
@@ -183,6 +184,7 @@ function findQuoteTable(sheetDoc, sharedStrings) {
   let creditsCol = null;
   let customNameCol = null;
   let sourceCol = null;
+  let partNumberCol = null;
   let pricingTermCol = null;
   for (const c of headerRow.getElementsByTagName('c')) {
     const text = resolveCellText(c, sharedStrings);
@@ -191,11 +193,12 @@ function findQuoteTable(sheetDoc, sharedStrings) {
     if (text === HEADER_TEXT_CREDITS) creditsCol = ref.colIndex;
     else if (text === HEADER_TEXT_CUSTOM_NAME) customNameCol = ref.colIndex;
     else if (text === HEADER_TEXT_SOURCE_PRICE) sourceCol = ref.colIndex;
+    else if (text === HEADER_TEXT_PART_NUMBER) partNumberCol = ref.colIndex;
     else if (text === HEADER_TEXT_PRICING_TERM) pricingTermCol = ref.colIndex;
   }
-  if (creditsCol == null || customNameCol == null || sourceCol == null) {
+  if (creditsCol == null || customNameCol == null || sourceCol == null || partNumberCol == null) {
     throw new Error(
-      `Erwartete Spalten ("${HEADER_TEXT_CREDITS}", "${HEADER_TEXT_CUSTOM_NAME}", "${HEADER_TEXT_SOURCE_PRICE}") nicht vollständig gefunden.`
+      `Erwartete Spalten ("${HEADER_TEXT_CREDITS}", "${HEADER_TEXT_CUSTOM_NAME}", "${HEADER_TEXT_SOURCE_PRICE}", "${HEADER_TEXT_PART_NUMBER}") nicht vollständig gefunden.`
     );
   }
   // "Pricing Term (in Months)" is optional — older/other export variants may not
@@ -204,23 +207,39 @@ function findQuoteTable(sheetDoc, sharedStrings) {
   const pricingTermLetters = pricingTermCol != null ? colIndexToLetters(pricingTermCol) : null;
 
   const sourceLetters = colIndexToLetters(sourceCol);
+  const partNumberLetters = colIndexToLetters(partNumberCol);
   const headerIndex = rows.indexOf(headerRow);
   const dataRows = [];
   for (let i = headerIndex + 1; i < rows.length; i++) {
     const row = rows[i];
     let sourceCell = null;
+    let partNumberCell = null;
     let pricingTermCell = null;
     for (const c of row.getElementsByTagName('c')) {
       const ref = parseCellRef(c.getAttribute('r'));
       if (!ref) continue;
       if (ref.letters === sourceLetters) sourceCell = c;
+      else if (ref.letters === partNumberLetters) partNumberCell = c;
       else if (pricingTermLetters && ref.letters === pricingTermLetters) pricingTermCell = c;
     }
-    if (!sourceCell || sourceCell.getAttribute('t')) break;
-    const vEl = sourceCell.getElementsByTagName('v')[0];
-    if (!vEl) break;
-    const value = parseFloat(vEl.textContent);
-    if (Number.isNaN(value)) break;
+    // "Part Number" is the reliable per-row anchor for "this is still an item
+    // row" — unlike the source price, which Cisco writes as a text placeholder
+    // ("--") rather than a number for lines with no price of their own (e.g.
+    // bundle child/sub-lines), so it can't double as an end-of-table signal.
+    const partNumberText = partNumberCell ? resolveCellText(partNumberCell, sharedStrings) : null;
+    if (!partNumberText) break;
+
+    // A missing/textual/zero source price means "nothing to convert" for this
+    // row (e.g. "--" placeholder or an actual 0) — not the end of the table.
+    let value = null;
+    if (sourceCell && !sourceCell.getAttribute('t')) {
+      const vEl = sourceCell.getElementsByTagName('v')[0];
+      if (vEl) {
+        const parsed = parseFloat(vEl.textContent);
+        if (!Number.isNaN(parsed) && parsed !== 0) value = parsed;
+      }
+    }
+
     const pricingTermVEl = pricingTermCell ? pricingTermCell.getElementsByTagName('v')[0] : null;
     const pricingTermMonths = pricingTermVEl ? parseFloat(pricingTermVEl.textContent) : 0;
     dataRows.push({ row, value, sourceCell, pricingTermMonths: Number.isNaN(pricingTermMonths) ? 0 : pricingTermMonths });
@@ -353,7 +372,11 @@ async function processFile(file, rate) {
     (c) => resolveCellText(c, sharedStrings) === HEADER_TEXT_CREDITS
   );
   const headerStyle = creditsHeaderCell ? creditsHeaderCell.getAttribute('s') : null;
-  const dataStyle = dataRows[0].sourceCell.getAttribute('s');
+  // Not necessarily dataRows[0] — a row can lack a source cell entirely (e.g. a
+  // "Requested Start Date" sub-line with no price column at all), so find the
+  // first row that actually has one to base the highlighted style on.
+  const styleSourceCell = dataRows.find((d) => d.sourceCell)?.sourceCell;
+  const dataStyle = styleSourceCell ? styleSourceCell.getAttribute('s') : null;
 
   const {
     headerStyleId: yellowHeaderStyle,
@@ -419,8 +442,11 @@ async function processFile(file, rate) {
 
   // New data cells — a real formula referencing the rate cell when available,
   // so changing the rate in Excel recalculates every price automatically.
+  // Rows with no usable source price (missing, "--" placeholder, or exactly 0)
+  // get no cell here at all — nothing is entered for them.
   for (const dataRow of dataRows) {
     const { row, value, sourceCell } = dataRow;
+    if (value == null) continue;
     const eur = roundToCents(value / rate);
     dataRow.eur = eur; // reused below for the subscription note column
     const cell = sheetDoc.createElementNS(NS, 'c');
@@ -442,7 +468,7 @@ async function processFile(file, rate) {
   // line. The note has to live in its own column rather than inside the "Price EUR"
   // cell itself: that cell holds a live formula (see above), and turning it into a
   // text string there would silently kill the auto-recalculation on rate changes.
-  const subscriptionRows = dataRows.filter((d) => d.pricingTermMonths > 0);
+  const subscriptionRows = dataRows.filter((d) => d.pricingTermMonths > 0 && d.eur != null);
   let noteColIndex = null;
   if (subscriptionRows.length > 0) {
     noteColIndex = findFirstFreeColumn(newColIndex + 1, [

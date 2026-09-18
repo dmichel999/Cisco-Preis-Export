@@ -20,8 +20,14 @@ Alle anderen Dateien im ZIP (`sharedStrings.xml`, Merged-Cell-Definitionen, Them
 Im aktuell bekannten Export-Format sind die Spalten "Credits" bis "Custom Name" P–AE und die Quellspalte "Unit Net Price Before Credits" ist O. Diese Buchstaben werden **nicht** hartkodiert, sondern zur Laufzeit über die Kopfzeilen-Zelltexte ermittelt:
 
 1. Suche die Zeile, die eine Zelle mit Text "Credits" enthält → Kopfzeile.
-2. Innerhalb dieser Zeile: Spalte von "Credits" (Start Ausblende-Bereich), Spalte von "Custom Name" (Ende Ausblende-Bereich, zugleich letzte Bestandsspalte), Spalte von "Unit Net Price Before Credits" (Quellwert für Umrechnung).
-3. Datenzeilen = alle Zeilen direkt nach der Kopfzeile, solange sie in der Quellspalte einen reinen Zahlenwert (kein Text) enthalten. Das erste Fehlen (z. B. Übergang zu "Adjustments"/"Note"-Abschnitt) beendet die Tabelle.
+2. Innerhalb dieser Zeile: Spalte von "Credits" (Start Ausblende-Bereich), Spalte von "Custom Name" (Ende Ausblende-Bereich, zugleich letzte Bestandsspalte), Spalte von "Unit Net Price Before Credits" (Quellwert für Umrechnung), Spalte von "Part Number" (Tabellenende-Anker, siehe unten).
+3. Datenzeilen = alle Zeilen direkt nach der Kopfzeile, solange sie in der Spalte "Part Number" einen nicht-leeren Wert haben. Die erste Zeile mit leerer "Part Number"-Zelle (z. B. Übergang zu "Adjustments"/"Note"-Abschnitt) beendet die Tabelle.
+
+### Tabellenende: "Part Number" statt "erste nicht-numerische Quellzelle"
+
+Bis v0.10.0 galt die erste Zeile ohne reinen Zahlenwert in der Quellspalte ("Unit Net Price Before Credits") als Tabellenende. Das brach im September 2026 an echten Quotes: Cisco schreibt für Zeilen ohne eigenen Preis (z. B. Kindzeilen eines Bundles, deren Preis in der Bundle-Zeile steckt) dort einen Text-Platzhalter (`"--"`) statt eine `0` oder eine leere Zelle — die allererste solche Zeile ließ das Tool sofort mit "Keine Artikelzeilen gefunden" abbrechen, obwohl danach noch reguläre Artikelzeilen folgten (in dem konkreten Fall sogar ausschließlich solche Zeilen, siehe Release 0.11.0).
+
+Das Tabellenende wird seit v0.11.0 stattdessen über die Spalte "Part Number" erkannt — jede echte Artikelzeile (auch eine ohne eigenen Preis) hat dort einen Wert, während Zeilen jenseits der Tabelle (Leerzeilen, "Note"-Zeile, AGB-Text) dort leer sind. Eine fehlende, textuelle oder exakt-`0`-Quellzelle bedeutet dadurch nur noch "kein Preis für diese Zeile" (keine "Price EUR"-Zelle wird angelegt), nicht mehr "Ende der Tabelle".
 
 Kurs- und Datumszeile werden relativ zur Kopfzeile adressiert (`previousElementSibling`, bzw. dessen Zeilennummer − 1), nicht über feste Zeilennummern — funktioniert auch, wenn der Header in einer anderen Quote-Datei in einer anderen Zeile liegt.
 

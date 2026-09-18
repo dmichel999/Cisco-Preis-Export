@@ -2,6 +2,16 @@
 
 Format nach [Keep a Changelog](https://keepachangelog.com/de/1.0.0/), Versionierung nach [SemVer](https://semver.org/lang/de/).
 
+## [0.11.0] - 2026-09-18
+
+### Fixed
+
+- Echte Quotes können in "Unit Net Price Before Credits" einen Text-Platzhalter (`"--"`) statt einer Zahl enthalten (z. B. Bundle-Kindzeilen ohne eigenen Preis) — das ließ das Tool bisher sofort mit "Keine Artikelzeilen unterhalb der Kopfzeile gefunden" abbrechen, weil die erste nicht-numerische Quellzelle fälschlich als Tabellenende galt. Das Tabellenende wird jetzt stattdessen über die Spalte "Part Number" erkannt (neuer Pflicht-Ankertext); eine fehlende/textuelle/exakt-0 Quellzelle bedeutet nur noch "kein Preis für diese Zeile", nicht mehr "Ende der Tabelle".
+
+### Changed
+
+- Zeilen ohne verwertbaren Preis (Quellzelle fehlt, ist Text wie `"--"`, oder ist exakt 0) bekommen jetzt gar keine "Price EUR"-Zelle (statt vorher `0,00 €` bzw. Abbruch) — für sie wird nichts eingetragen, auch keine Subscription-Hinweis-Zelle.
+
 ## [0.10.0] - 2026-09-18
 
 ### Added
