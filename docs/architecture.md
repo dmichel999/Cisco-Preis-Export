@@ -15,6 +15,12 @@
 
 Alle anderen Dateien im ZIP (`sharedStrings.xml`, Merged-Cell-Definitionen, Themes, etc.) bleiben byteidentisch zum Original. Dadurch bleibt die Formatierung garantiert erhalten — es wird nichts "nachgebaut", nur gezielt ergänzt.
 
+### Neue Zellen müssen an sortierter Position eingefügt werden, nicht angehängt
+
+OOXML verlangt, dass `<c>`-Elemente innerhalb einer `<row>` in aufsteigender Spaltenreihenfolge stehen. Bis v0.13.0 wurden neue Zellen per `rowEl.appendChild(cell)` immer als letztes Element eingefügt — das brach bei Quotes, die *nach* der neu eingefügten Spalte noch weitere, bereits vorhandene Spalten mit Inhalt haben (z. B. eine Cisco-eigene Berechnungsspalte hinter "Custom Name", siehe "BPA No Subscription Line"/`findFirstFreeColumn`). Excel zeigte dann beim Öffnen den Reparieren-Dialog ("Wir haben ein Problem bei einigen Inhalten erkannt").
+
+Seit v0.14.0 übernimmt `insertCellInOrder(rowEl, cellEl, colIndex)` das Einfügen: Es sucht die erste vorhandene Zelle mit größerem Spaltenindex und fügt per `insertBefore` davor ein, statt blind anzuhängen. Jede Stelle, die eine neue `<c>`-Zelle in eine bestehende `<row>` einfügt (Kurs-Zelle, Datums-Zelle, Kopfzellen, Preis-Datenzellen, Preishinweis-Zellen), muss diese Funktion verwenden statt `appendChild`.
+
 ## Spalten-/Zeilenerkennung: Text-basiert, nicht Buchstaben-basiert
 
 Im aktuell bekannten Export-Format sind die Spalten "Credits" bis "Custom Name" P–AE und die Quellspalte "Unit Net Price Before Credits" ist O. Diese Buchstaben werden **nicht** hartkodiert, sondern zur Laufzeit über die Kopfzeilen-Zelltexte ermittelt:

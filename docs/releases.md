@@ -2,6 +2,12 @@
 
 Format nach [Keep a Changelog](https://keepachangelog.com/de/1.0.0/), Versionierung nach [SemVer](https://semver.org/lang/de/).
 
+## [0.14.0] - 2026-09-18
+
+### Fixed
+
+- Excel zeigte bei manchen Quotes "Wir haben ein Problem bei einigen Inhalten erkannt. Sollen wir so viel wie möglich wiederherstellen?" beim Öffnen der erzeugten Datei. Ursache: Neue `<c>`-Zellen wurden per `appendChild` immer als letztes Element einer `<row>` angehängt — bei Quotes mit vorhandenen Spalten *nach* der neuen Preis-Spalte (z. B. eine bereits vorhandene Berechnungsspalte hinter "Custom Name") verletzte das die von OOXML verlangte aufsteigende Spaltenreihenfolge innerhalb einer Zeile. Neue Zellen werden jetzt an der korrekten sortierten Position eingefügt (`insertCellInOrder`).
+
 ## [0.13.0] - 2026-09-18
 
 ### Added
