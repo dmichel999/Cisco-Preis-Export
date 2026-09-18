@@ -2,6 +2,19 @@
 
 Format nach [Keep a Changelog](https://keepachangelog.com/de/1.0.0/), Versionierung nach [SemVer](https://semver.org/lang/de/).
 
+## [0.17.0] - 2026-09-18
+
+Sauberer Neuaufbau der Subscription-Hinweis-Spalte auf Basis von v0.9.0, mit klarer Trennregel: Alles, was in v0.9.0 funktionierte (insbesondere die Berechnung von "Price EUR" aus "Unit Net Price Before Credits"), bleibt unangetastet. Neu ist ausschließlich die additive Hinweis-Spalte.
+
+### Added
+
+- Enthält "Pricing Term (in Months)" für eine Zeile eine Zahl (Subscription-Lizenz statt Einmalkauf), bekommt sie in einer neuen Spalte direkt hinter "Price EUR" den Text "Der Einzelpreis pro X Monate = Y" (X = Pricing Term, Y = der für diese Zeile bereits berechnete "Price EUR"-Wert — keine andere/zusätzliche Spalte wird dafür herangezogen). Die Spalte fehlt komplett, wenn keine Zeile eine Subscription-Lizenz enthält.
+
+### Fixed
+
+- Tabellenende wird über die Spalte "Part Number" erkannt statt über die erste Zeile mit nicht-numerischem Preis — reale Quotes können in "Unit Net Price Before Credits" einen Text-Platzhalter (`"--"`) für Zeilen ohne eigenen Preis enthalten (z. B. Bundle-Kindzeilen), was die alte Erkennung sofort mit "Keine Artikelzeilen gefunden" abbrechen ließ. Die Berechnung selbst (`ROUND(<Quellzelle>/Kurs,2)`) bleibt unverändert; eine nicht-numerische/fehlende/exakt-0 Quellzelle ergibt jetzt `0,00 €` statt eines Abbruchs.
+- Neue Zellen werden jetzt an der laut OOXML korrekten, sortierten Position in die Zeile eingefügt statt immer ans Ende angehängt — bei Quotes mit weiteren, bereits vorhandenen Spalten nach der neuen Preis-Spalte verletzte das sonst die geforderte aufsteigende Spaltenreihenfolge und Excel zeigte beim Öffnen den Reparieren-Dialog.
+
 ## Revert auf v0.9.0 - 2026-09-18
 
 Alle Änderungen aus den Versionen 0.10.0–0.16.0 (Subscription-Hinweis-Spalte, "Part Number"-Tabellenende-Erkennung, "Unit List Price"-Umschaltung, Zell-Reihenfolge-Fix, "bereits verarbeitet"-Prüfung) wurden vollständig zurückgenommen — sie funktionierten in der Praxis nicht zuverlässig. `js/app.js` und die Doku entsprechen wieder exakt dem Stand von v0.9.0.

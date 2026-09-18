@@ -1,12 +1,15 @@
 // thought up by human, coded by ai
 'use strict';
 
-const APP_VERSION = '0.9.0';
+const APP_VERSION = '0.17.0';
 
 const HEADER_TEXT_CREDITS = 'Credits';
 const HEADER_TEXT_CUSTOM_NAME = 'Custom Name';
 const HEADER_TEXT_SOURCE_PRICE = 'Unit Net Price Before Credits';
+const HEADER_TEXT_PART_NUMBER = 'Part Number';
+const HEADER_TEXT_PRICING_TERM = 'Pricing Term (in Months)';
 const NEW_COLUMN_HEADER = 'Price EUR';
+const SUBSCRIPTION_NOTE_HEADER = 'Preishinweis';
 const HIGHLIGHT_FILL_ARGB = 'FFFFFF01';
 const EUR_NUM_FMT_CODE = '#,##0.00" €"';
 const CUSTOM_NUM_FMT_ID_BASE = 164; // custom number format IDs conventionally start at 164
@@ -60,7 +63,11 @@ function resolveCellText(cellEl, sharedStrings) {
     for (const tEl of isEl.getElementsByTagName('t')) text += tEl.textContent || '';
     return text;
   }
-  return null;
+  // No `t` attribute means a plain number (OOXML default) — e.g. "Pricing Term
+  // (in Months)" or "Part Number" can be written as a real number rather than
+  // a string, so this has to resolve both the same way.
+  const vEl = cellEl.getElementsByTagName('v')[0];
+  return vEl ? vEl.textContent : null;
 }
 
 function bumpRowSpans(rowEl, newColIndex) {
@@ -89,6 +96,20 @@ function findFirstFreeColumn(startCol, rowEls) {
   let col = startCol;
   while (rowEls.some((rowEl) => isColumnOccupied(rowEl, col))) col++;
   return col;
+}
+
+// OOXML requires <c> elements within a <row> to appear in ascending column order.
+// Our new columns aren't always the last one in the row — some real exports have
+// further columns after "Custom Name" (see findFirstFreeColumn) — so a plain
+// appendChild would put the new cell after those, producing a file Excel flags
+// as needing "repair". This inserts it at the correct sorted position instead.
+function insertCellInOrder(rowEl, cellEl, colIndex) {
+  const nextCell = Array.from(rowEl.getElementsByTagName('c')).find((c) => {
+    const ref = parseCellRef(c.getAttribute('r'));
+    return ref && ref.colIndex > colIndex;
+  });
+  if (nextCell) rowEl.insertBefore(cellEl, nextCell);
+  else rowEl.appendChild(cellEl);
 }
 
 function roundToCents(value) {
@@ -181,6 +202,8 @@ function findQuoteTable(sheetDoc, sharedStrings) {
   let creditsCol = null;
   let customNameCol = null;
   let sourceCol = null;
+  let partNumberCol = null;
+  let pricingTermCol = null;
   for (const c of headerRow.getElementsByTagName('c')) {
     const text = resolveCellText(c, sharedStrings);
     const ref = parseCellRef(c.getAttribute('r'));
@@ -188,32 +211,58 @@ function findQuoteTable(sheetDoc, sharedStrings) {
     if (text === HEADER_TEXT_CREDITS) creditsCol = ref.colIndex;
     else if (text === HEADER_TEXT_CUSTOM_NAME) customNameCol = ref.colIndex;
     else if (text === HEADER_TEXT_SOURCE_PRICE) sourceCol = ref.colIndex;
+    else if (text === HEADER_TEXT_PART_NUMBER) partNumberCol = ref.colIndex;
+    else if (text === HEADER_TEXT_PRICING_TERM) pricingTermCol = ref.colIndex;
   }
-  if (creditsCol == null || customNameCol == null || sourceCol == null) {
+  if (creditsCol == null || customNameCol == null || sourceCol == null || partNumberCol == null) {
     throw new Error(
-      `Erwartete Spalten ("${HEADER_TEXT_CREDITS}", "${HEADER_TEXT_CUSTOM_NAME}", "${HEADER_TEXT_SOURCE_PRICE}") nicht vollständig gefunden.`
+      `Erwartete Spalten ("${HEADER_TEXT_CREDITS}", "${HEADER_TEXT_CUSTOM_NAME}", "${HEADER_TEXT_SOURCE_PRICE}", "${HEADER_TEXT_PART_NUMBER}") nicht vollständig gefunden.`
     );
   }
+  // "Pricing Term (in Months)" is optional — without it, no row can be
+  // identified as a subscription line, and the note column stays a no-op.
+  const pricingTermLetters = pricingTermCol != null ? colIndexToLetters(pricingTermCol) : null;
 
   const sourceLetters = colIndexToLetters(sourceCol);
+  const partNumberLetters = colIndexToLetters(partNumberCol);
   const headerIndex = rows.indexOf(headerRow);
   const dataRows = [];
   for (let i = headerIndex + 1; i < rows.length; i++) {
     const row = rows[i];
     let sourceCell = null;
+    let partNumberCell = null;
+    let pricingTermCell = null;
     for (const c of row.getElementsByTagName('c')) {
       const ref = parseCellRef(c.getAttribute('r'));
-      if (ref && ref.letters === sourceLetters) {
-        sourceCell = c;
-        break;
+      if (!ref) continue;
+      if (ref.letters === sourceLetters) sourceCell = c;
+      else if (ref.letters === partNumberLetters) partNumberCell = c;
+      else if (pricingTermLetters && ref.letters === pricingTermLetters) pricingTermCell = c;
+    }
+    // "Part Number" is the reliable per-row anchor for "this is still an item
+    // row" — unlike the source price, which Cisco writes as a text placeholder
+    // ("--") rather than a number for lines with no price of their own (e.g.
+    // bundle child/sub-lines), so it can't double as an end-of-table signal.
+    const partNumberText = partNumberCell ? resolveCellText(partNumberCell, sharedStrings) : null;
+    if (!partNumberText) break;
+
+    // Unit Net Price Before Credits computation itself is untouched: a plain
+    // number cell is read exactly as before. A missing/textual/zero source
+    // price (e.g. the "--" placeholder) just means 0 here, not "end of table".
+    let value = 0;
+    if (sourceCell && !sourceCell.getAttribute('t')) {
+      const vEl = sourceCell.getElementsByTagName('v')[0];
+      if (vEl) {
+        const parsed = parseFloat(vEl.textContent);
+        if (!Number.isNaN(parsed)) value = parsed;
       }
     }
-    if (!sourceCell || sourceCell.getAttribute('t')) break;
-    const vEl = sourceCell.getElementsByTagName('v')[0];
-    if (!vEl) break;
-    const value = parseFloat(vEl.textContent);
-    if (Number.isNaN(value)) break;
-    dataRows.push({ row, value, sourceCell });
+
+    const pricingTermText = pricingTermCell ? resolveCellText(pricingTermCell, sharedStrings) : null;
+    const parsedTerm = pricingTermText ? parseFloat(pricingTermText) : NaN;
+    const pricingTermMonths = Number.isNaN(parsedTerm) ? 0 : parsedTerm;
+
+    dataRows.push({ row, value, sourceCell, pricingTermMonths });
   }
   if (dataRows.length === 0) {
     throw new Error('Keine Artikelzeilen unterhalb der Kopfzeile gefunden.');
@@ -343,7 +392,11 @@ async function processFile(file, rate) {
     (c) => resolveCellText(c, sharedStrings) === HEADER_TEXT_CREDITS
   );
   const headerStyle = creditsHeaderCell ? creditsHeaderCell.getAttribute('s') : null;
-  const dataStyle = dataRows[0].sourceCell.getAttribute('s');
+  // Not necessarily dataRows[0] — a row can lack a source cell entirely (e.g. a
+  // "Requested Start Date" sub-line with no price column at all), so find the
+  // first row that actually has one to base the highlighted style on.
+  const styleSourceCell = dataRows.find((d) => d.sourceCell)?.sourceCell;
+  const dataStyle = styleSourceCell ? styleSourceCell.getAttribute('s') : null;
 
   const {
     headerStyleId: yellowHeaderStyle,
@@ -365,7 +418,7 @@ async function processFile(file, rate) {
     const rateValueEl = sheetDoc.createElementNS(NS, 'v');
     rateValueEl.textContent = String(rate);
     rateCell.appendChild(rateValueEl);
-    rateRow.appendChild(rateCell);
+    insertCellInOrder(rateRow, rateCell, newColIndex);
     bumpRowSpans(rateRow, newColIndex);
   }
 
@@ -391,7 +444,7 @@ async function processFile(file, rate) {
     dateTextEl.textContent = formatDateDE(new Date());
     dateIsEl.appendChild(dateTextEl);
     dateCell.appendChild(dateIsEl);
-    dateRow.appendChild(dateCell);
+    insertCellInOrder(dateRow, dateCell, newColIndex);
   }
 
   // New header cell
@@ -404,17 +457,24 @@ async function processFile(file, rate) {
   headerTextEl.textContent = NEW_COLUMN_HEADER;
   isEl.appendChild(headerTextEl);
   headerCell.appendChild(isEl);
-  headerRow.appendChild(headerCell);
+  insertCellInOrder(headerRow, headerCell, newColIndex);
   bumpRowSpans(headerRow, newColIndex);
 
   // New data cells — a real formula referencing the rate cell when available,
   // so changing the rate in Excel recalculates every price automatically.
-  for (const { row, value, sourceCell } of dataRows) {
+  // Every item row gets a cell, even one showing 0,00 (e.g. Cisco's "--"
+  // placeholder for a line with no price of its own resolves to 0 in
+  // findQuoteTable). A formula is only added when there's an actual source
+  // cell to reference; rows without one (e.g. a "Requested Start Date"
+  // sub-line with no price column at all) get the plain value.
+  for (const dataRow of dataRows) {
+    const { row, value, sourceCell } = dataRow;
     const eur = roundToCents(value / rate);
+    dataRow.eur = eur; // reused below for the subscription note column
     const cell = sheetDoc.createElementNS(NS, 'c');
     cell.setAttribute('r', `${newColLetters}${row.getAttribute('r')}`);
     cell.setAttribute('s', yellowDataStyle);
-    if (rateCellRef) {
+    if (rateCellRef && sourceCell) {
       const fEl = sheetDoc.createElementNS(NS, 'f');
       fEl.textContent = `ROUND(${sourceCell.getAttribute('r')}/${rateCellRef},2)`;
       cell.appendChild(fEl);
@@ -422,8 +482,53 @@ async function processFile(file, rate) {
     const vEl = sheetDoc.createElementNS(NS, 'v');
     vEl.textContent = String(eur);
     cell.appendChild(vEl);
-    row.appendChild(cell);
+    insertCellInOrder(row, cell, newColIndex);
     bumpRowSpans(row, newColIndex);
+  }
+
+  // Subscription note column — "Pricing Term (in Months)" > 0 marks a subscription
+  // line. Lives in its own column right after "Price EUR" rather than inside that
+  // cell itself: that cell holds a live formula, and turning it into a text string
+  // there would silently kill the auto-recalculation on rate changes. Y is simply
+  // the same EUR price already computed above for that row.
+  const subscriptionRows = dataRows.filter((d) => d.pricingTermMonths > 0);
+  let noteColIndex = null;
+  if (subscriptionRows.length > 0) {
+    noteColIndex = findFirstFreeColumn(newColIndex + 1, [
+      headerRow,
+      rateRow,
+      existingDateRow,
+      ...dataRows.map((d) => d.row),
+    ]);
+    const noteColLetters = colIndexToLetters(noteColIndex);
+
+    const noteHeaderCell = sheetDoc.createElementNS(NS, 'c');
+    noteHeaderCell.setAttribute('r', `${noteColLetters}${headerRow.getAttribute('r')}`);
+    noteHeaderCell.setAttribute('s', yellowHeaderStyle);
+    noteHeaderCell.setAttribute('t', 'inlineStr');
+    const noteHeaderIsEl = sheetDoc.createElementNS(NS, 'is');
+    const noteHeaderTextEl = sheetDoc.createElementNS(NS, 't');
+    noteHeaderTextEl.textContent = SUBSCRIPTION_NOTE_HEADER;
+    noteHeaderIsEl.appendChild(noteHeaderTextEl);
+    noteHeaderCell.appendChild(noteHeaderIsEl);
+    insertCellInOrder(headerRow, noteHeaderCell, noteColIndex);
+    bumpRowSpans(headerRow, noteColIndex);
+
+    for (const { row, eur, pricingTermMonths } of subscriptionRows) {
+      const months = Math.round(pricingTermMonths);
+      const eurFormatted = `${eur.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €`;
+      const noteCell = sheetDoc.createElementNS(NS, 'c');
+      noteCell.setAttribute('r', `${noteColLetters}${row.getAttribute('r')}`);
+      noteCell.setAttribute('s', rateStyleId);
+      noteCell.setAttribute('t', 'inlineStr');
+      const noteIsEl = sheetDoc.createElementNS(NS, 'is');
+      const noteTextEl = sheetDoc.createElementNS(NS, 't');
+      noteTextEl.textContent = `Der Einzelpreis pro ${months} Monate = ${eurFormatted}`;
+      noteIsEl.appendChild(noteTextEl);
+      noteCell.appendChild(noteIsEl);
+      insertCellInOrder(row, noteCell, noteColIndex);
+      bumpRowSpans(row, noteColIndex);
+    }
   }
 
   // Hide every column between "Credits" and the new "Price EUR" column — not just
@@ -451,12 +556,23 @@ async function processFile(file, rate) {
   newColWidth.setAttribute('customWidth', '1');
   colsEl.appendChild(newColWidth);
 
+  if (noteColIndex != null) {
+    const noteColWidth = sheetDoc.createElementNS(NS, 'col');
+    noteColWidth.setAttribute('min', String(noteColIndex));
+    noteColWidth.setAttribute('max', String(noteColIndex));
+    noteColWidth.setAttribute('width', '32');
+    noteColWidth.setAttribute('customWidth', '1');
+    colsEl.appendChild(noteColWidth);
+  }
+
   // Extend dimension reference
   const dimEl = sheetDoc.getElementsByTagName('dimension')[0];
   if (dimEl) {
+    const lastColIndex = noteColIndex != null ? noteColIndex : newColIndex;
+    const lastColLetters = noteColIndex != null ? colIndexToLetters(noteColIndex) : newColLetters;
     const m = dimEl.getAttribute('ref').match(/^([A-Z]+)(\d+):([A-Z]+)(\d+)$/);
-    if (m && colLettersToIndex(m[3]) < newColIndex) {
-      dimEl.setAttribute('ref', `${m[1]}${m[2]}:${newColLetters}${m[4]}`);
+    if (m && colLettersToIndex(m[3]) < lastColIndex) {
+      dimEl.setAttribute('ref', `${m[1]}${m[2]}:${lastColLetters}${m[4]}`);
     }
   }
 
@@ -469,7 +585,7 @@ async function processFile(file, rate) {
     mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
     compression: 'DEFLATE',
   });
-  return { blob, rateCellRef };
+  return { blob, rateCellRef, subscriptionNoteCount: subscriptionRows.length };
 }
 
 async function downloadResult(blob, filename) {
@@ -580,7 +696,7 @@ function initUI() {
         throw new Error('Bitte einen gültigen, positiven Umrechnungskurs eingeben.');
       }
       setStatus('Verarbeite Datei…', null);
-      const { blob, rateCellRef } = await processFile(selectedFile, rate);
+      const { blob, rateCellRef, subscriptionNoteCount } = await processFile(selectedFile, rate);
       setStatus('Speichere Datei…', null);
       const result = await downloadResult(blob, selectedFile.name);
       if (result === 'cancelled') {
@@ -589,7 +705,8 @@ function initUI() {
         const rateHint = rateCellRef
           ? ` Kurs in ${rateCellRef.replace(/\$/g, '')} anpassen berechnet alle Preise in Excel automatisch neu.`
           : '';
-        setStatus(`Fertig — Spalte "${NEW_COLUMN_HEADER}" mit Kurs ${rate} ergänzt.${rateHint}`, 'success');
+        const noteHint = subscriptionNoteCount > 0 ? ` ${subscriptionNoteCount} Subscription-Zeile(n) mit Hinweis versehen.` : '';
+        setStatus(`Fertig — Spalte "${NEW_COLUMN_HEADER}" mit Kurs ${rate} ergänzt.${rateHint}${noteHint}`, 'success');
       }
     } catch (err) {
       console.error(err);
