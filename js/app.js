@@ -1,7 +1,7 @@
 // thought up by human, coded by ai
 'use strict';
 
-const APP_VERSION = '0.12.0';
+const APP_VERSION = '0.13.0';
 
 const HEADER_TEXT_CREDITS = 'Credits';
 const HEADER_TEXT_CUSTOM_NAME = 'Custom Name';
@@ -192,6 +192,7 @@ function findQuoteTable(sheetDoc, sharedStrings) {
   let partNumberCol = null;
   let pricingTermCol = null;
   let listPriceCol = null;
+  let alreadyProcessed = false;
   for (const c of headerRow.getElementsByTagName('c')) {
     const text = resolveCellText(c, sharedStrings);
     const ref = parseCellRef(c.getAttribute('r'));
@@ -202,6 +203,16 @@ function findQuoteTable(sheetDoc, sharedStrings) {
     else if (text === HEADER_TEXT_PART_NUMBER) partNumberCol = ref.colIndex;
     else if (text === HEADER_TEXT_PRICING_TERM) pricingTermCol = ref.colIndex;
     else if (text === HEADER_TEXT_LIST_PRICE) listPriceCol = ref.colIndex;
+    else if (text === NEW_COLUMN_HEADER) alreadyProcessed = true;
+  }
+  // Feeding an already-processed file (with its own "Price EUR" column) back in
+  // would otherwise silently add a second, colliding "Price EUR" column next to
+  // the first — always process the original Cisco export, never a previous
+  // output of this tool.
+  if (alreadyProcessed) {
+    throw new Error(
+      `Diese Datei enthält bereits eine Spalte "${NEW_COLUMN_HEADER}" — sie wurde offenbar schon einmal verarbeitet. Bitte die ursprüngliche, unveränderte Cisco-Quote verwenden.`
+    );
   }
   if (creditsCol == null || customNameCol == null || sourceCol == null || partNumberCol == null) {
     throw new Error(

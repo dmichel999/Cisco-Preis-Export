@@ -24,6 +24,7 @@ Eine Cisco-Quote-Exportdatei (`.xlsx`) wird im Browser geladen, verändert und w
 ## Fehlerbehandlung
 
 - Fehlt eine der vier Ankertext-Spalten ("Credits", "Custom Name", "Unit Net Price Before Credits", "Part Number") im ersten Tabellenblatt, bricht das Tool mit einer klaren Fehlermeldung ab, statt eine falsche Spalte zu erraten.
+- Enthält die Datei bereits eine Spalte "Price EUR" (wurde also schon einmal mit diesem Tool verarbeitet), bricht das Tool mit klarer Fehlermeldung ab, statt eine zweite, kollidierende Spalte danebenzusetzen.
 - Ungültiger Kurs (leer, negativ, nicht-numerisch) wird vor der Verarbeitung abgefangen.
 - Datei, die kein gültiges `.xlsx`/ZIP ist, wird mit Fehlermeldung abgelehnt.
 

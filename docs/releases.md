@@ -2,6 +2,12 @@
 
 Format nach [Keep a Changelog](https://keepachangelog.com/de/1.0.0/), Versionierung nach [SemVer](https://semver.org/lang/de/).
 
+## [0.13.0] - 2026-09-18
+
+### Added
+
+- Klare Fehlermeldung, wenn eine bereits verarbeitete Datei (mit existierender "Price EUR"-Spalte) erneut hochgeladen wird, statt stillschweigend eine zweite, kollidierende "Price EUR"-Spalte danebenzusetzen. Bitte immer die ursprüngliche, unveränderte Cisco-Quote verarbeiten, nie eine bereits erzeugte Ausgabedatei.
+
 ## [0.12.0] - 2026-09-18
 
 ### Fixed
