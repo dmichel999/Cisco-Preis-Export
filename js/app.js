@@ -1,7 +1,7 @@
 // thought up by human, coded by ai
 'use strict';
 
-const APP_VERSION = '0.14.0';
+const APP_VERSION = '0.15.0';
 
 const HEADER_TEXT_CREDITS = 'Credits';
 const HEADER_TEXT_CUSTOM_NAME = 'Custom Name';
@@ -279,14 +279,14 @@ function findQuoteTable(sheetDoc, sharedStrings) {
     // that price is a per-transaction net price, not meaningful per license).
     const priceCell = pricingTermMonths > 0 && listPriceCell ? listPriceCell : sourceCell;
 
-    // A missing/textual/zero source price means "nothing to convert" for this
-    // row (e.g. "--" placeholder or an actual 0) — not the end of the table.
-    let value = null;
+    // Every item row gets a Price EUR value, even 0,00 — a missing/textual
+    // source price (e.g. Cisco's "--" placeholder) just defaults to 0.
+    let value = 0;
     if (priceCell && !priceCell.getAttribute('t')) {
       const vEl = priceCell.getElementsByTagName('v')[0];
       if (vEl) {
         const parsed = parseFloat(vEl.textContent);
-        if (!Number.isNaN(parsed) && parsed !== 0) value = parsed;
+        if (!Number.isNaN(parsed)) value = parsed;
       }
     }
 
@@ -490,17 +490,19 @@ async function processFile(file, rate) {
 
   // New data cells — a real formula referencing the rate cell when available,
   // so changing the rate in Excel recalculates every price automatically.
-  // Rows with no usable source price (missing, "--" placeholder, or exactly 0)
-  // get no cell here at all — nothing is entered for them.
+  // Every item row gets a cell, even one showing 0,00 (no usable source price
+  // just means a plain 0 value — see the "Every item row gets a Price EUR
+  // value" comment in findQuoteTable). A formula is only added when there's
+  // an actual source cell to reference; rows without one (e.g. a "Requested
+  // Start Date" sub-line with no price column at all) get the plain value.
   for (const dataRow of dataRows) {
     const { row, value, sourceCell } = dataRow;
-    if (value == null) continue;
     const eur = roundToCents(value / rate);
     dataRow.eur = eur; // reused below for the subscription note column
     const cell = sheetDoc.createElementNS(NS, 'c');
     cell.setAttribute('r', `${newColLetters}${row.getAttribute('r')}`);
     cell.setAttribute('s', yellowDataStyle);
-    if (rateCellRef) {
+    if (rateCellRef && sourceCell) {
       const fEl = sheetDoc.createElementNS(NS, 'f');
       fEl.textContent = `ROUND(${sourceCell.getAttribute('r')}/${rateCellRef},2)`;
       cell.appendChild(fEl);

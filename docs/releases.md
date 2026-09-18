@@ -2,6 +2,12 @@
 
 Format nach [Keep a Changelog](https://keepachangelog.com/de/1.0.0/), Versionierung nach [SemVer](https://semver.org/lang/de/).
 
+## [0.15.0] - 2026-09-18
+
+### Changed
+
+- **Zurückgenommen (0.11.0):** Zeilen ohne verwertbaren Preis (Quellzelle fehlt, ist Text wie `"--"`, oder ist exakt 0) bekommen wieder eine "Price EUR"-Zelle, jetzt mit `0,00 €` statt komplett ausgelassen zu werden — wie im Verhalten vor den Preisspalten-Fixes dieser Woche. Betrifft auch die Subscription-Hinweis-Spalte: Eine Subscription-Zeile mit Preis `0,00 €` bekommt jetzt ebenfalls ihren Hinweistext ("Der Einzelpreis pro X Monate = 0,00 €"). Nur Zeilen ganz ohne Quellzelle (z. B. eine reine "Requested Start Date"-Notizzeile) bekommen weiterhin keine Formel, sondern einen festen `0,00 €`-Wert ohne Bezug.
+
 ## [0.14.0] - 2026-09-18
 
 ### Fixed
