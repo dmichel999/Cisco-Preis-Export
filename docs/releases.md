@@ -2,6 +2,13 @@
 
 Format nach [Keep a Changelog](https://keepachangelog.com/de/1.0.0/), Versionierung nach [SemVer](https://semver.org/lang/de/).
 
+## [0.12.0] - 2026-09-18
+
+### Fixed
+
+- Subscription-Zeilen (Pricing Term > 0) verwenden jetzt "Unit List Price" als Quellpreis statt "Unit Net Price Before Credits" — Cisco trägt bei Subscription-Lizenzen in letzterer Spalte nur `"--"` ein (der Netto-Preis pro Transaktion ist dort nicht aussagekräftig), den eigentlichen Lizenzpreis liefert "Unit List Price". Nicht-Subscription-Zeilen nutzen weiterhin "Unit Net Price Before Credits" wie bisher.
+- `resolveCellText` gab für Zellen ohne `t`-Attribut (reine Zahl, z. B. "Pricing Term (in Months)" als echte Zahl statt Shared-String) `null` zurück. Dadurch wurden reale Subscription-Zeilen fälschlich als "keine Subscription" (Term = 0) erkannt, weil ihr numerischer Term-Wert nicht ausgelesen werden konnte. Betrifft auch die "Part Number"-Tabellenende-Erkennung, falls Part Numbers rein numerisch sind.
+
 ## [0.11.0] - 2026-09-18
 
 ### Fixed

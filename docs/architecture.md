@@ -29,6 +29,12 @@ Bis v0.10.0 galt die erste Zeile ohne reinen Zahlenwert in der Quellspalte ("Uni
 
 Das Tabellenende wird seit v0.11.0 stattdessen über die Spalte "Part Number" erkannt — jede echte Artikelzeile (auch eine ohne eigenen Preis) hat dort einen Wert, während Zeilen jenseits der Tabelle (Leerzeilen, "Note"-Zeile, AGB-Text) dort leer sind. Eine fehlende, textuelle oder exakt-`0`-Quellzelle bedeutet dadurch nur noch "kein Preis für diese Zeile" (keine "Price EUR"-Zelle wird angelegt), nicht mehr "Ende der Tabelle".
 
+### Quellpreis je Zeile: "Unit List Price" für Subscription-Zeilen
+
+Cisco trägt in "Unit Net Price Before Credits" für Subscription-Lizenzen (`"Pricing Term (in Months)"` > 0) nur den Platzhalter `"--"` ein — der Netto-Preis pro Transaktion ist dort für eine Lizenz mit Laufzeit nicht aussagekräftig. Der tatsächliche Lizenzpreis steht stattdessen in "Unit List Price" (optionale Ankertext-Spalte, wie "Pricing Term"). Seit v0.12.0 wird deshalb pro Zeile situativ die Quellspalte gewählt: `pricingTermMonths > 0` → "Unit List Price", sonst weiterhin "Unit Net Price Before Credits". Die gewählte Zelle wird 1:1 als `sourceCell` weitergereicht, sodass die Formel-Erzeugung (`ROUND(<Quellzelle>/$Kurszelle,2)`) unverändert bleibt, egal aus welcher Spalte der Wert stammt.
+
+**Stolperfalle beim Pricing-Term-Auslesen:** "Pricing Term (in Months)" ist in echten Exporten mal ein Shared-String (oft mit einem *leeren* String — "kein Term gesetzt", kein numerischer Fallback), mal eine reine Zahl (`t`-Attribut fehlt komplett). `resolveCellText` deckte den letzteren Fall bis v0.12.0 nicht ab (gab `null` zurück) — ein rein numerischer Zellwert ohne `t`-Attribut wird jetzt ebenfalls über `<v>` aufgelöst statt fälschlich als "kein Wert" zu gelten. Das betrifft auch die "Part Number"-Erkennung, falls eine Part Number rein numerisch wäre.
+
 Kurs- und Datumszeile werden relativ zur Kopfzeile adressiert (`previousElementSibling`, bzw. dessen Zeilennummer − 1), nicht über feste Zeilennummern — funktioniert auch, wenn der Header in einer anderen Quote-Datei in einer anderen Zeile liegt.
 
 **Warum:** Cisco kann die Spaltenreihenfolge zwischen Portal-Versionen ändern, ohne die Struktur (Kopfzeilentexte) zu ändern. Text-basierte Erkennung ist robuster als feste Spaltenbuchstaben und degradiert kontrolliert (klare Fehlermeldung statt stillem Falsch-Ergebnis), falls sich die Kopfzeilentexte doch ändern.

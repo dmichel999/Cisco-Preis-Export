@@ -1,13 +1,14 @@
 // thought up by human, coded by ai
 'use strict';
 
-const APP_VERSION = '0.11.0';
+const APP_VERSION = '0.12.0';
 
 const HEADER_TEXT_CREDITS = 'Credits';
 const HEADER_TEXT_CUSTOM_NAME = 'Custom Name';
 const HEADER_TEXT_SOURCE_PRICE = 'Unit Net Price Before Credits';
 const HEADER_TEXT_PART_NUMBER = 'Part Number';
 const HEADER_TEXT_PRICING_TERM = 'Pricing Term (in Months)';
+const HEADER_TEXT_LIST_PRICE = 'Unit List Price';
 const NEW_COLUMN_HEADER = 'Price EUR';
 const SUBSCRIPTION_NOTE_HEADER = 'Preishinweis';
 const HIGHLIGHT_FILL_ARGB = 'FFFFFF01';
@@ -63,7 +64,11 @@ function resolveCellText(cellEl, sharedStrings) {
     for (const tEl of isEl.getElementsByTagName('t')) text += tEl.textContent || '';
     return text;
   }
-  return null;
+  // No `t` attribute means a plain number (OOXML default) — e.g. "Pricing Term
+  // (in Months)" is written as a real number in some quotes and as an (often
+  // empty) shared string in others, so this has to resolve both the same way.
+  const vEl = cellEl.getElementsByTagName('v')[0];
+  return vEl ? vEl.textContent : null;
 }
 
 function bumpRowSpans(rowEl, newColIndex) {
@@ -186,6 +191,7 @@ function findQuoteTable(sheetDoc, sharedStrings) {
   let sourceCol = null;
   let partNumberCol = null;
   let pricingTermCol = null;
+  let listPriceCol = null;
   for (const c of headerRow.getElementsByTagName('c')) {
     const text = resolveCellText(c, sharedStrings);
     const ref = parseCellRef(c.getAttribute('r'));
@@ -195,16 +201,20 @@ function findQuoteTable(sheetDoc, sharedStrings) {
     else if (text === HEADER_TEXT_SOURCE_PRICE) sourceCol = ref.colIndex;
     else if (text === HEADER_TEXT_PART_NUMBER) partNumberCol = ref.colIndex;
     else if (text === HEADER_TEXT_PRICING_TERM) pricingTermCol = ref.colIndex;
+    else if (text === HEADER_TEXT_LIST_PRICE) listPriceCol = ref.colIndex;
   }
   if (creditsCol == null || customNameCol == null || sourceCol == null || partNumberCol == null) {
     throw new Error(
       `Erwartete Spalten ("${HEADER_TEXT_CREDITS}", "${HEADER_TEXT_CUSTOM_NAME}", "${HEADER_TEXT_SOURCE_PRICE}", "${HEADER_TEXT_PART_NUMBER}") nicht vollständig gefunden.`
     );
   }
-  // "Pricing Term (in Months)" is optional — older/other export variants may not
-  // have it. Without it, no row can be identified as a subscription line, which
-  // just means the note column feature below stays a no-op.
+  // "Pricing Term (in Months)" and "Unit List Price" are optional — older/other
+  // export variants may not have them. Without "Pricing Term", no row can be
+  // identified as a subscription line (note column stays a no-op, and the
+  // source-price swap below never triggers). Without "Unit List Price", a
+  // subscription row just falls back to the normal source price column.
   const pricingTermLetters = pricingTermCol != null ? colIndexToLetters(pricingTermCol) : null;
+  const listPriceLetters = listPriceCol != null ? colIndexToLetters(listPriceCol) : null;
 
   const sourceLetters = colIndexToLetters(sourceCol);
   const partNumberLetters = colIndexToLetters(partNumberCol);
@@ -215,12 +225,14 @@ function findQuoteTable(sheetDoc, sharedStrings) {
     let sourceCell = null;
     let partNumberCell = null;
     let pricingTermCell = null;
+    let listPriceCell = null;
     for (const c of row.getElementsByTagName('c')) {
       const ref = parseCellRef(c.getAttribute('r'));
       if (!ref) continue;
       if (ref.letters === sourceLetters) sourceCell = c;
       else if (ref.letters === partNumberLetters) partNumberCell = c;
       else if (pricingTermLetters && ref.letters === pricingTermLetters) pricingTermCell = c;
+      else if (listPriceLetters && ref.letters === listPriceLetters) listPriceCell = c;
     }
     // "Part Number" is the reliable per-row anchor for "this is still an item
     // row" — unlike the source price, which Cisco writes as a text placeholder
@@ -229,20 +241,31 @@ function findQuoteTable(sheetDoc, sharedStrings) {
     const partNumberText = partNumberCell ? resolveCellText(partNumberCell, sharedStrings) : null;
     if (!partNumberText) break;
 
+    // Pricing Term is sometimes a shared-string cell with an *empty* string
+    // (no term set) rather than a plain number — reading its raw <v> text
+    // directly would misread the shared-string index as the month count, so
+    // this has to go through resolveCellText to actually dereference it.
+    const pricingTermText = pricingTermCell ? resolveCellText(pricingTermCell, sharedStrings) : null;
+    const parsedTerm = pricingTermText ? parseFloat(pricingTermText) : NaN;
+    const pricingTermMonths = Number.isNaN(parsedTerm) ? 0 : parsedTerm;
+
+    // Subscription lines carry their real price in "Unit List Price", not
+    // "Unit Net Price Before Credits" (which Cisco leaves as "--" for them —
+    // that price is a per-transaction net price, not meaningful per license).
+    const priceCell = pricingTermMonths > 0 && listPriceCell ? listPriceCell : sourceCell;
+
     // A missing/textual/zero source price means "nothing to convert" for this
     // row (e.g. "--" placeholder or an actual 0) — not the end of the table.
     let value = null;
-    if (sourceCell && !sourceCell.getAttribute('t')) {
-      const vEl = sourceCell.getElementsByTagName('v')[0];
+    if (priceCell && !priceCell.getAttribute('t')) {
+      const vEl = priceCell.getElementsByTagName('v')[0];
       if (vEl) {
         const parsed = parseFloat(vEl.textContent);
         if (!Number.isNaN(parsed) && parsed !== 0) value = parsed;
       }
     }
 
-    const pricingTermVEl = pricingTermCell ? pricingTermCell.getElementsByTagName('v')[0] : null;
-    const pricingTermMonths = pricingTermVEl ? parseFloat(pricingTermVEl.textContent) : 0;
-    dataRows.push({ row, value, sourceCell, pricingTermMonths: Number.isNaN(pricingTermMonths) ? 0 : pricingTermMonths });
+    dataRows.push({ row, value, sourceCell: priceCell, pricingTermMonths });
   }
   if (dataRows.length === 0) {
     throw new Error('Keine Artikelzeilen unterhalb der Kopfzeile gefunden.');
