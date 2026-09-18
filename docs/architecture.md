@@ -55,6 +55,10 @@ Statt eines fest berechneten Werts bekommt jede Preiszeile eine echte Formel: `<
 
 Der Kurs wird als **USD pro EUR** verstanden (Cisco-Dealkurse werden so angegeben, z. B. `1.08`) — der USD-Preis wird also durch den Kurs geteilt, nicht multipliziert. Rundung erfolgt über `Math.round(value * 100) / 100` auf den bereits geteilten Wert — kaufmännische Rundung auf 2 Nachkommastellen, wie in der Quelltabelle (Format `#,##0.00`) üblich.
 
+## Subscription-Hinweis: eigene Spalte statt Text in der Preis-Zelle
+
+Der Hinweistext für Subscription-Zeilen ("Der Einzelpreis pro X Monate = Y") landet bewusst in einer eigenen Spalte rechts neben "Price EUR", nicht in derselben Zelle. Die "Price EUR"-Zelle trägt eine echte Formel (siehe "Live-Neuberechnung" oben) — würde man dort zusätzlich Text anhängen, müsste die Zelle zu einem festen `inlineStr`-Textwert werden und die Formel (und damit die automatische Neuberechnung bei Kursänderung) ginge für genau diese Zeilen verloren. Die neue Spalte wird wie "Price EUR" per `findFirstFreeColumn` ermittelt (ausgehend von der Spalte direkt nach "Price EUR"), damit sie nicht mit weiteren, künftig von Cisco eingefügten Spalten kollidiert. Sie entsteht nur, wenn mindestens eine Zeile der Quote tatsächlich eine Subscription-Lizenz ist (`"Pricing Term (in Months)"` > 0) — ist die Spalte "Pricing Term (in Months)" im Export gar nicht vorhanden, bleibt das Feature ein stiller No-op statt eines Fehlers (siehe Spaltenerkennung oben).
+
 ## Download: Overwrite-Semantik
 
 Die File System Access API (`showSaveFilePicker`) erlaubt in Chromium-Browsern ein echtes Überschreiben der Originaldatei ohne zusätzlichen Download-Ordner-Eintrag. Firefox und Safari unterstützen diese API nicht (Stand 2026) — dort greift ein Fallback über `<a download>` mit identischem Dateinamen; die Kollisionsbehandlung (Nachfrage/Suffix) übernimmt dann der Browser selbst. Beide Pfade sind nötig, da Ziel-Umgebung alle Evergreen-Browser sind (siehe MASTERPROMPT.md).

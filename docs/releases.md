@@ -2,6 +2,12 @@
 
 Format nach [Keep a Changelog](https://keepachangelog.com/de/1.0.0/), Versionierung nach [SemVer](https://semver.org/lang/de/).
 
+## [0.10.0] - 2026-09-18
+
+### Added
+
+- Subscription-Zeilen (erkennbar an "Pricing Term (in Months)" > 0) bekommen eine zusätzliche Spalte "Preishinweis" mit dem Text "Der Einzelpreis pro X Monate = Y" (X = Pricing Term, Y = berechneter EUR-Preis der Zeile). Eigene Spalte statt Text in der "Price EUR"-Zelle selbst, damit deren Formel/Live-Neuberechnung bei Kursänderung erhalten bleibt (siehe docs/architecture.md).
+
 ## [0.9.0] - 2026-09-15
 
 ### Changed
