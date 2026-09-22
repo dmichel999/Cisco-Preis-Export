@@ -2,7 +2,19 @@
 
 Format nach [Keep a Changelog](https://keepachangelog.com/de/1.0.0/), Versionierung nach [SemVer](https://semver.org/lang/de/).
 
-## [0.17.0] - 2026-09-18
+## [0.18.0] - 2026-09-22
+
+Erneuter, diesmal verifizierter Anlauf für die Subscription-Hinweis-Spalte. v0.17.0 (18.09.) hatte die Tabellenende-Erkennung von "erste nicht-numerische Quellzelle" auf "Spalte Part Number" umgestellt — das war keine reine Ergänzung, sondern eine Änderung der von "Price EUR" genutzten Kernlogik, die in der Praxis zu falschen/fehlenden Berechnungen führte. `js/app.js` wurde daher exakt auf den zuletzt bestätigt funktionierenden Stand v0.9.0 zurückgesetzt; die Subscription-Spalte wurde als komplett separater, additiver Layer obendrauf neu gebaut (eigene Lese-Funktion für "Pricing Term", eigener Berechnungsblock nach der unveränderten Preis-Schleife) und diesmal vor dem Release per Test-Harness gegen zwei synthetische Quotes verifiziert (mit und ohne Pricing-Term-Spalte).
+
+### Added
+
+- Enthält "Pricing Term (in Months)" für eine Zeile eine Zahl (Subscription-Lizenz statt Einmalkauf), bekommt sie in einer neuen Spalte "Preishinweis" direkt hinter "Price EUR" den Text "Der Einzelpreis pro X Monate = Y" (X = Pricing Term, Y = der für diese Zeile bereits berechnete "Price EUR"-Wert). Die Spalte fehlt komplett, wenn keine Zeile eine Subscription-Lizenz enthält oder die Spalte "Pricing Term (in Months)" im Export gar nicht vorkommt.
+
+### Changed
+
+- **Revert:** Tabellenende-Erkennung ist wieder "erste Zeile mit nicht-numerischer/fehlender Quellzelle" (Stand v0.9.0), nicht mehr über "Part Number". Der damit verbundene Bundle-Kindzeilen-Fix ("--"-Platzhalter) aus v0.17.0 ist damit ebenfalls zurückgenommen — kann bei Bedarf separat und einzeln verifiziert wieder ergänzt werden.
+
+## [0.17.0] - 2026-09-18 (zurückgenommen, siehe 0.18.0)
 
 Sauberer Neuaufbau der Subscription-Hinweis-Spalte auf Basis von v0.9.0, mit klarer Trennregel: Alles, was in v0.9.0 funktionierte (insbesondere die Berechnung von "Price EUR" aus "Unit Net Price Before Credits"), bleibt unangetastet. Neu ist ausschließlich die additive Hinweis-Spalte.
 

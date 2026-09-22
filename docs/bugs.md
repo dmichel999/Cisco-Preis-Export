@@ -1,3 +1,3 @@
 # Bekannte Bugs
 
-Aktuell keine bekannten Bugs.
+- **Bundle-Kindzeilen mit "--"-Platzhalter beenden die Tabellenerkennung zu früh.** Enthält "Unit Net Price Before Credits" bei einer Zeile Text statt einer Zahl (z. B. Ciscos `"--"` für eine Kindzeile ohne eigenen Preis), wertet das Tool das als Tabellenende — nachfolgende reguläre Artikelzeilen würden dann nicht mehr erfasst. Ein Fix (Tabellenende über "Part Number" statt Quellzelle erkennen) wurde am 18.09.2026 versucht, hat dabei aber die "Price EUR"-Berechnung in der Praxis kaputt gemacht und wurde am 22.09.2026 komplett zurückgenommen (siehe docs/releases.md 0.18.0, docs/architecture.md). Ein neuer Versuch muss streng additiv sein und vor Release gegen eine echte Quote mit Bundle-Kindzeilen verifiziert werden.

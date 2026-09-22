@@ -20,20 +20,10 @@ Alle anderen Dateien im ZIP (`sharedStrings.xml`, Merged-Cell-Definitionen, Them
 Im aktuell bekannten Export-Format sind die Spalten "Credits" bis "Custom Name" P–AE und die Quellspalte "Unit Net Price Before Credits" ist O. Diese Buchstaben werden **nicht** hartkodiert, sondern zur Laufzeit über die Kopfzeilen-Zelltexte ermittelt:
 
 1. Suche die Zeile, die eine Zelle mit Text "Credits" enthält → Kopfzeile.
-2. Innerhalb dieser Zeile: Spalte von "Credits" (Start Ausblende-Bereich), Spalte von "Custom Name" (Ende Ausblende-Bereich, zugleich letzte Bestandsspalte), Spalte von "Unit Net Price Before Credits" (Quellwert für Umrechnung), Spalte von "Part Number" (Tabellenende-Anker, siehe unten).
-3. Datenzeilen = alle Zeilen direkt nach der Kopfzeile, solange sie in der Spalte "Part Number" einen nicht-leeren Wert haben. Die erste Zeile mit leerer "Part Number"-Zelle (z. B. Übergang zu "Adjustments"/"Note"-Abschnitt) beendet die Tabelle.
+2. Innerhalb dieser Zeile: Spalte von "Credits" (Start Ausblende-Bereich), Spalte von "Custom Name" (Ende Ausblende-Bereich, zugleich letzte Bestandsspalte), Spalte von "Unit Net Price Before Credits" (Quellwert für Umrechnung).
+3. Datenzeilen = alle Zeilen direkt nach der Kopfzeile, solange die Zelle in der Quellspalte "Unit Net Price Before Credits" eine gültige, plain-numerische Zahl enthält. Die erste Zeile mit fehlender/nicht-numerischer Quellzelle (z. B. Übergang zu "Adjustments"/"Note"-Abschnitt) beendet die Tabelle.
 
-### Tabellenende: "Part Number" statt "erste nicht-numerische Quellzelle"
-
-Reale Quotes können in "Unit Net Price Before Credits" einen Text-Platzhalter (`"--"`) statt einer Zahl enthalten — z. B. für Kindzeilen eines Bundles, deren Preis in der Bundle-Zeile steckt. Die erste solche Zeile als Tabellenende zu werten (frühere Logik) ließ das Tool bei solchen Quotes sofort mit "Keine Artikelzeilen gefunden" abbrechen, obwohl danach noch reguläre Artikelzeilen folgten.
-
-Das Tabellenende wird deshalb über die Spalte "Part Number" erkannt — jede echte Artikelzeile (auch eine ohne eigenen Preis) hat dort einen Wert, während Zeilen jenseits der Tabelle (Leerzeilen, "Note"-Zeile, AGB-Text) dort leer sind. **Die Berechnung von "Price EUR" selbst ändert sich dadurch nicht** — sie bleibt exakt `ROUND(<Quellzelle aus "Unit Net Price Before Credits">/Kurs,2)` für jede Zeile. Eine fehlende, textuelle oder exakt-`0`-Quellzelle ergibt dabei `0` (→ `0,00 €`), statt die Zelle auszulassen oder die Tabelle zu beenden. Nur eine Zeile ganz ohne Quellzelle (kein `sourceCell`, z. B. eine reine Notizzeile ohne eigene Preisspalte) bekommt ihren `0,00 €`-Wert ohne Formelbezug — jede Zeile mit einer Quellzelle bekommt weiterhin die Live-Formel, auch wenn deren Ergebnis 0 ist.
-
-### Neue Zellen müssen an sortierter Position eingefügt werden, nicht angehängt
-
-OOXML verlangt, dass `<c>`-Elemente innerhalb einer `<row>` in aufsteigender Spaltenreihenfolge stehen. Neue Zellen per `appendChild` immer ans Zeilenende zu hängen bricht bei Quotes, die *nach* der neu eingefügten Spalte noch weitere, bereits vorhandene Spalten mit Inhalt haben (z. B. eine Cisco-eigene Berechnungsspalte hinter "Custom Name") — Excel zeigt dann beim Öffnen den Reparieren-Dialog ("Wir haben ein Problem bei einigen Inhalten erkannt").
-
-`insertCellInOrder(rowEl, cellEl, colIndex)` übernimmt deshalb jedes Einfügen einer neuen `<c>`-Zelle in eine bestehende `<row>` (Kurs-Zelle, Datums-Zelle, Kopfzellen, Preis-Datenzellen, Preishinweis-Zellen): Es sucht die erste vorhandene Zelle mit größerem Spaltenindex und fügt per `insertBefore` davor ein, statt blind anzuhängen.
+**Bekannte Einschränkung (bewusst in Kauf genommen, siehe Release 0.18.0):** Enthält "Unit Net Price Before Credits" bei einer Bundle-Kindzeile einen Text-Platzhalter (z. B. `"--"`) statt einer Zahl, wertet das Tool das als Tabellenende — nachfolgende reguläre Artikelzeilen würden dann nicht mehr erfasst. Ein Fix darüber (Tabellenende stattdessen über "Part Number" erkennen) wurde am 18.09. versucht, hat aber die "Price EUR"-Berechnung in der Praxis kaputt gemacht und wurde am 22.09. wieder vollständig zurückgenommen. Ein neuer Versuch müsste streng additiv sein und vor dem Release gegen eine echte Quote mit Bundle-Kindzeilen verifiziert werden.
 
 ### Subscription-Hinweis: eigene Spalte statt Text in der Preis-Zelle
 
@@ -43,7 +33,7 @@ Ist "Pricing Term (in Months)" für eine Zeile eine Zahl > 0 (Subscription-Lizen
 
 Die neue Spalte wird wie "Price EUR" per `findFirstFreeColumn` ermittelt (ausgehend von der Spalte direkt nach "Price EUR"), damit sie nicht mit weiteren, künftig von Cisco eingefügten Spalten kollidiert. Sie entsteht nur, wenn mindestens eine Zeile der Quote tatsächlich eine Subscription-Lizenz ist — ist die Spalte "Pricing Term (in Months)" im Export gar nicht vorhanden, bleibt das Feature ein stiller No-op statt eines Fehlers.
 
-**Stolperfalle beim Pricing-Term-Auslesen:** "Pricing Term (in Months)" ist in echten Exporten mal ein Shared-String (oft mit einem *leeren* String — "kein Term gesetzt"), mal eine reine Zahl (`t`-Attribut fehlt komplett). `resolveCellText` löst inzwischen auch Zellen ohne `t`-Attribut über `<v>` auf, statt sie fälschlich als "kein Wert" zu behandeln — das betrifft auch die "Part Number"-Erkennung, falls eine Part Number rein numerisch wäre.
+**Stolperfalle beim Pricing-Term-Auslesen:** "Pricing Term (in Months)" ist in echten Exporten mal ein Shared-String (oft mit einem *leeren* String — "kein Term gesetzt"), mal eine reine Zahl (`t`-Attribut fehlt komplett). Dafür gibt es die eigene, lokale Funktion `resolvePricingTermMonths` — bewusst getrennt von `resolveCellText`, damit diese für "Credits"/"Custom Name"/"Unit Net Price Before Credits" genutzte Kernfunktion unverändert bleibt (siehe Release 0.18.0: das war genau der Fehler beim ersten Anlauf am 18.09.).
 
 Kurs- und Datumszeile werden relativ zur Kopfzeile adressiert (`previousElementSibling`, bzw. dessen Zeilennummer − 1), nicht über feste Zeilennummern — funktioniert auch, wenn der Header in einer anderen Quote-Datei in einer anderen Zeile liegt.
 
