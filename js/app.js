@@ -1,7 +1,7 @@
 // thought up by human, coded by ai
 'use strict';
 
-const APP_VERSION = '0.21.0';
+const APP_VERSION = '0.22.0';
 
 const HEADER_TEXT_CREDITS = 'Credits';
 const HEADER_TEXT_CUSTOM_NAME = 'Custom Name';
@@ -141,6 +141,38 @@ function insertCellInOrder(rowEl, cellEl, colIndex) {
   });
   if (nextCell) rowEl.insertBefore(cellEl, nextCell);
   else rowEl.appendChild(cellEl);
+}
+
+// Wie insertCellInOrder, aber für Spalten, die absichtlich wiederverwendet werden
+// (z. B. "Preishinweis" bei einem erneuten Lauf über eine bereits verarbeitete
+// Datei — siehe "Preishinweis"-Platzierung unten): Existiert an der Zielspalte in
+// dieser Zeile bereits eine Zelle (typischerweise unsere eigene aus einem früheren
+// Durchlauf), wird sie ersetzt statt eine zweite Zelle mit derselben Spaltenreferenz
+// einzufügen — zwei <c>-Elemente mit gleichem "r" in einer <row> sind ungültiges
+// OOXML und lösen denselben Reparieren-Dialog aus wie eine falsche Sortierung.
+function upsertCellInOrder(rowEl, cellEl, colIndex) {
+  const existing = Array.from(rowEl.getElementsByTagName('c')).find((c) => {
+    const ref = parseCellRef(c.getAttribute('r'));
+    return ref && ref.colIndex === colIndex;
+  });
+  if (existing) rowEl.replaceChild(cellEl, existing);
+  else insertCellInOrder(rowEl, cellEl, colIndex);
+}
+
+// Läuft das Tool erneut über eine bereits verarbeitete Datei, liegen im <cols>-
+// Container schon Bereiche aus dem vorherigen Durchlauf (Ausblende-Bereich bis zur
+// alten "Price EUR"-Spalte, deren eigene Breite, ggf. "Preishinweis"). Die neuen
+// Bereiche dieses Durchlaufs überlappen sich damit zwangsläufig mit den alten
+// (der Ausblende-Bereich wird ja bis zur NEUEN, weiter rechts liegenden "Price
+// EUR"-Spalte verlängert) — zwei überlappende <col>-Bereiche sind ungültiges
+// OOXML. Alle Bereiche, die die Zielspanne dieses Durchlaufs berühren, werden
+// deshalb vor dem Einfügen der frischen Bereiche entfernt.
+function removeOverlappingColRanges(colsEl, minIndex, maxIndex) {
+  for (const col of Array.from(colsEl.getElementsByTagName('col'))) {
+    const colMin = parseInt(col.getAttribute('min'), 10);
+    const colMax = parseInt(col.getAttribute('max'), 10);
+    if (colMin <= maxIndex && colMax >= minIndex) colsEl.removeChild(col);
+  }
 }
 
 function roundToCents(value) {
@@ -502,7 +534,20 @@ async function processFile(file, rate) {
           (row) => parseInt(row.getAttribute('r'), 10) === dateRowNum
         );
 
-  const newColIndex = findFirstFreeColumn(customNameCol + 1, [
+  // Läuft das Tool ein weiteres Mal über eine bereits verarbeitete Datei, landet
+  // die neue "Price EUR"-Spalte direkt hinter der letzten bereits vorhandenen
+  // "Price EUR"-Spalte, nicht wieder ab "Custom Name" gesucht — sonst müsste die
+  // Suche jedes Mal an alten "Price EUR"/"Preishinweis"-Spalten vorbei, was bei
+  // wiederholten Läufen unnötig große Lücken erzeugt.
+  let searchStartCol = customNameCol + 1;
+  for (const c of headerRow.getElementsByTagName('c')) {
+    if (resolveCellText(c, sharedStrings) === NEW_COLUMN_HEADER) {
+      const ref = parseCellRef(c.getAttribute('r'));
+      if (ref && ref.colIndex + 1 > searchStartCol) searchStartCol = ref.colIndex + 1;
+    }
+  }
+
+  const newColIndex = findFirstFreeColumn(searchStartCol, [
     headerRow,
     rateRow,
     existingDateRow,
@@ -613,12 +658,37 @@ async function processFile(file, rate) {
   const subscriptionRows = dataRows.filter((d) => (d.pricingTermMonths || 0) > 0);
   let noteColIndex = null;
   if (subscriptionRows.length > 0) {
-    noteColIndex = findFirstFreeColumn(newColIndex + 1, [
-      headerRow,
-      rateRow,
-      existingDateRow,
-      ...dataRows.map((d) => d.row),
-    ]);
+    // Bei einem erneuten Lauf über dieselbe Datei kann eine alte "Preishinweis"-
+    // Spalte an einer ANDEREN Stelle stehen als dort, wo die neue "Price EUR"-
+    // Spalte diesmal landet (z. B. wenn dazwischen weitere alte "Price EUR"-Spalten
+    // aus noch früheren Läufen liegen). Die alte Spalte wird komplett entfernt
+    // (nicht nur überschrieben) — sonst blieben zwei "Preishinweis"-Spalten stehen.
+    const targetNoteCol = newColIndex + 1;
+    let oldNoteCol = null;
+    for (const c of headerRow.getElementsByTagName('c')) {
+      if (resolveCellText(c, sharedStrings) === SUBSCRIPTION_NOTE_HEADER) {
+        const ref = parseCellRef(c.getAttribute('r'));
+        if (ref && ref.colIndex !== targetNoteCol) oldNoteCol = ref.colIndex;
+        break;
+      }
+    }
+    if (oldNoteCol != null) {
+      for (const row of Array.from(sheetDataEl.getElementsByTagName('row'))) {
+        const cell = Array.from(row.getElementsByTagName('c')).find((c) => {
+          const ref = parseCellRef(c.getAttribute('r'));
+          return ref && ref.colIndex === oldNoteCol;
+        });
+        if (cell) row.removeChild(cell);
+      }
+    }
+
+    // Bewusst KEINE Suche nach der nächsten freien Spalte (anders als "Price EUR"
+    // oben): "Preishinweis" soll immer direkt neben "Price EUR" stehen, nicht an
+    // vorhandenem Inhalt vorbei ausweichen. Steht an dieser Position schon eine
+    // Zelle — typischerweise die eigene "Preishinweis"-Spalte aus einem früheren
+    // Lauf über dieselbe, bereits verarbeitete Datei — wird sie überschrieben
+    // (upsertCellInOrder) statt eine zweite, weiter rechts liegende anzulegen.
+    noteColIndex = newColIndex + 1;
     const noteColLetters = colIndexToLetters(noteColIndex);
 
     const noteHeaderCell = sheetDoc.createElementNS(NS, 'c');
@@ -630,7 +700,7 @@ async function processFile(file, rate) {
     noteHeaderTextEl.textContent = SUBSCRIPTION_NOTE_HEADER;
     noteHeaderIsEl.appendChild(noteHeaderTextEl);
     noteHeaderCell.appendChild(noteHeaderIsEl);
-    insertCellInOrder(headerRow, noteHeaderCell, noteColIndex);
+    upsertCellInOrder(headerRow, noteHeaderCell, noteColIndex);
     bumpRowSpans(headerRow, noteColIndex);
 
     for (const { row, value, pricingTermMonths } of subscriptionRows) {
@@ -646,7 +716,7 @@ async function processFile(file, rate) {
       noteTextEl.textContent = `Der Einzelpreis pro ${months} Monate = ${eurFormatted}`;
       noteIsEl.appendChild(noteTextEl);
       noteCell.appendChild(noteIsEl);
-      insertCellInOrder(row, noteCell, noteColIndex);
+      upsertCellInOrder(row, noteCell, noteColIndex);
       bumpRowSpans(row, noteColIndex);
     }
   }
@@ -714,6 +784,7 @@ async function processFile(file, rate) {
     colsEl = sheetDoc.createElementNS(NS, 'cols');
     sheetDataEl.parentNode.insertBefore(colsEl, sheetDataEl);
   }
+  removeOverlappingColRanges(colsEl, creditsCol, noteColIndex != null ? noteColIndex : newColIndex);
   const hideCol = sheetDoc.createElementNS(NS, 'col');
   hideCol.setAttribute('min', String(creditsCol));
   hideCol.setAttribute('max', String(newColIndex - 1));

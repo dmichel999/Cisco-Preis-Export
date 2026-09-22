@@ -2,6 +2,18 @@
 
 Format nach [Keep a Changelog](https://keepachangelog.com/de/1.0.0/), Versionierung nach [SemVer](https://semver.org/lang/de/).
 
+## [0.22.0] - 2026-09-22
+
+Beim Test mit einer schon einmal verarbeiteten Datei lagen zwei Spalten Platz zwischen "Price EUR" und "Preishinweis" — die Suche nach einer freien Spalte für "Preishinweis" ist an alten, bereits belegten Spalten aus früheren Durchläufen vorbeigelaufen.
+
+### Changed
+
+- **"Preishinweis" landet jetzt immer exakt eine Spalte hinter "Price EUR"**, ohne Suche nach der nächsten freien Spalte. Steht dort schon eine Zelle (typischerweise die eigene "Preishinweis"-Spalte aus einem früheren Lauf über dieselbe Datei), wird sie überschrieben statt eine weitere, weiter rechts liegende Spalte anzulegen (`upsertCellInOrder`). Existiert eine alte "Preishinweis"-Spalte an einer *anderen* Position (weil dazwischen weitere alte "Price EUR"-Spalten liegen), wird sie komplett entfernt statt als Duplikat stehen zu bleiben.
+- **"Price EUR" startet die Suche nach der nächsten freien Spalte jetzt hinter der letzten bereits vorhandenen "Price EUR"-Spalte**, nicht mehr immer ab "Custom Name" — konvergiert bei wiederholten Läufen schneller zu einer sinnvollen Position.
+- **`<cols>`-Bereiche (Ausblenden/Breite) werden vor dem Einfügen bereinigt:** Beim wiederholten Lauf überlappt der neue Ausblende-Bereich zwangsläufig mit dem alten (er reicht ja jetzt bis zur neuen, weiter rechts liegenden "Price EUR"-Spalte) — zwei überlappende `<col>`-Bereiche sind ungültiges OOXML und hätten denselben Reparieren-Dialog wie in 0.20.1 ausgelöst. Alle Bereiche, die die neue Zielspanne berühren, werden deshalb vorher entfernt.
+
+Verifiziert gegen eine frische synthetische Quote, eine echte Quote mit genau einem vorherigen (unvollständigen) Lauf, und eine mehrfach verarbeitete Testdatei (dort bleibt eine vorbestehende Zellreihenfolge-Beschädigung aus einem alten, fehlerhaften Tool-Stand bestehen — das ist keine neue Regression, siehe docs/bugs.md).
+
 ## [0.21.0] - 2026-09-22
 
 Bei der realen ISE-Quote zeigte "Price EUR" trotz des 0.20.x-Fixes weiterhin überall `0,00 €` — auch bei den Subscription-Zeilen, für die der User einen echten Preis erwartete.
