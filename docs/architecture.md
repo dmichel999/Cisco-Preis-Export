@@ -20,10 +20,16 @@ Alle anderen Dateien im ZIP (`sharedStrings.xml`, Merged-Cell-Definitionen, Them
 Im aktuell bekannten Export-Format sind die Spalten "Credits" bis "Custom Name" P–AE und die Quellspalte "Unit Net Price Before Credits" ist O. Diese Buchstaben werden **nicht** hartkodiert, sondern zur Laufzeit über die Kopfzeilen-Zelltexte ermittelt:
 
 1. Suche die Zeile, die eine Zelle mit Text "Credits" enthält → Kopfzeile.
-2. Innerhalb dieser Zeile: Spalte von "Credits" (Start Ausblende-Bereich), Spalte von "Custom Name" (Ende Ausblende-Bereich, zugleich letzte Bestandsspalte), Spalte von "Unit Net Price Before Credits" (Quellwert für Umrechnung).
-3. Datenzeilen = alle Zeilen direkt nach der Kopfzeile, solange die Zelle in der Quellspalte "Unit Net Price Before Credits" eine gültige, plain-numerische Zahl enthält. Die erste Zeile mit fehlender/nicht-numerischer Quellzelle (z. B. Übergang zu "Adjustments"/"Note"-Abschnitt) beendet die Tabelle.
+2. Innerhalb dieser Zeile: Spalte von "Credits" (Start Ausblende-Bereich), Spalte von "Custom Name" (Ende Ausblende-Bereich, zugleich letzte Bestandsspalte), Spalte von "Unit Net Price Before Credits" (Quellwert für Umrechnung), Spalte von "Part Number" (Tabellenende-Anker, siehe unten).
+3. Datenzeilen = alle Zeilen direkt nach der Kopfzeile, solange die Spalte "Part Number" einen nicht-leeren Wert hat. Die erste Zeile mit leerer "Part Number"-Zelle (z. B. Übergang zu "Adjustments"/"Note"-Abschnitt) beendet die Tabelle.
 
-**Bekannte Einschränkung (bewusst in Kauf genommen, siehe Release 0.18.0):** Enthält "Unit Net Price Before Credits" bei einer Bundle-Kindzeile einen Text-Platzhalter (z. B. `"--"`) statt einer Zahl, wertet das Tool das als Tabellenende — nachfolgende reguläre Artikelzeilen würden dann nicht mehr erfasst. Ein Fix darüber (Tabellenende stattdessen über "Part Number" erkennen) wurde am 18.09. versucht, hat aber die "Price EUR"-Berechnung in der Praxis kaputt gemacht und wurde am 22.09. wieder vollständig zurückgenommen. Ein neuer Versuch müsste streng additiv sein und vor dem Release gegen eine echte Quote mit Bundle-Kindzeilen verifiziert werden.
+### Tabellenende: "Part Number" statt "erste nicht-numerische Quellzelle" (0.20.0, zweiter Anlauf)
+
+Reale Quotes können in "Unit Net Price Before Credits" einen Text-Platzhalter (`"--"`) statt einer Zahl enthalten — z. B. bei Bundle-Kindzeilen, oder komplett bei EA-/Subscription-Quotes (z. B. Cisco-ISE-Lizenzen), wo **jede einzelne** Artikelzeile `"--"`/0 hat, weil der reale Gesamtpreis nicht pro Zeile, sondern nur als "Quote Total" in einem separaten Financial-Summary-Block steht (siehe unten). Die erste solche Zeile als Tabellenende zu werten ließ das Tool bei solchen Quotes sofort mit "Keine Artikelzeilen gefunden" abbrechen.
+
+Das Tabellenende wird deshalb über die Spalte "Part Number" erkannt — jede echte Artikelzeile (auch eine ohne eigenen Preis) hat dort einen Wert. **Die Berechnung von "Price EUR" selbst ändert sich dadurch nicht** — sie bleibt exakt `ROUND(<Quellzelle>/Kurs,2)`; eine fehlende/textuelle/`0`-Quellzelle ergibt weiterhin `0,00 €` statt eines Abbruchs. Eine Zeile ganz ohne Quellzelle (z. B. eine "Requested Start Date"-Unterzeile ohne eigene Preisspalte) bekommt ihren `0,00 €`-Wert ohne Formelbezug.
+
+**Zweiter Anlauf, diesmal isoliert:** Ein erster Fix-Versuch am 18.09.2026 hat dieselbe Idee mit mehreren anderen, nicht getesteten Änderungen (`resolveCellText`-Erweiterung, sortierte Zell-Einfüge-Reihenfolge statt `appendChild`) in einem Rutsch gebündelt — das Ergebnis war in der Praxis kaputt und wurde am 22.09.2026 komplett zurückgenommen (siehe Release 0.18.0). Der jetzige Fix (0.20.0) ändert **ausschließlich** das Tabellenende-Kriterium plus eine direkt daraus folgende Absicherung (Formel-Zelle nur bei vorhandener Quellzelle — ohne die kann's jetzt wieder Zeilen ganz ohne Quellzelle geben), sonst nichts. Verifiziert gegen eine reale EA-Quote sowie zwei synthetische Regressions-Quotes.
 
 ### Subscription-Hinweis: eigene Spalte statt Text in der Preis-Zelle
 
@@ -38,6 +44,14 @@ Die neue Spalte wird wie "Price EUR" per `findFirstFreeColumn` ermittelt (ausgeh
 Kurs- und Datumszeile werden relativ zur Kopfzeile adressiert (`previousElementSibling`, bzw. dessen Zeilennummer − 1), nicht über feste Zeilennummern — funktioniert auch, wenn der Header in einer anderen Quote-Datei in einer anderen Zeile liegt.
 
 **Warum:** Cisco kann die Spaltenreihenfolge zwischen Portal-Versionen ändern, ohne die Struktur (Kopfzeilentexte) zu ändern. Text-basierte Erkennung ist robuster als feste Spaltenbuchstaben und degradiert kontrolliert (klare Fehlermeldung statt stillem Falsch-Ergebnis), falls sich die Kopfzeilentexte doch ändern.
+
+### Quote-Total-Umrechnung: eigener, komplett unabhängiger Pfad (0.20.0)
+
+EA-/Subscription-Quotes (z. B. Cisco-ISE-Lizenzen) haben in der Artikeltabelle oft **gar keinen** brauchbaren Zeilenpreis (siehe oben) — der reale Gesamtpreis steht stattdessen in einem separaten "Financial Summary"-Block weiter oben im Blatt, als eigene kleine Tabelle mit Kopfzeile (u. a. Spalten "... List Price", "Discount %", "Special Items Total") und mehreren Ergebniszeilen (Product-/Service-/Subscription-SubTotal, "Quote Total").
+
+`findQuoteTotalCell` (`js/app.js`) sucht dafür zwei unabhängige Textanker über das gesamte Blatt: eine Zeile mit Zelltext "Quote Total" (Zeilen-Anker) und eine Spalte mit Kopftext "Special Items Total" (Spalten-Anker — bewusst **nicht** "... List Price", das ist der Betrag vor Rabatt). Nur der Schnittpunkt beider Anker — plain-numerisch, kein Text — wird als Quelle akzeptiert. Fehlt einer der beiden Anker (normale Quotes ohne diesen Block), bleibt das Feature stiller No-op, komplett unabhängig von `findQuoteTable`/der Artikeltabelle.
+
+Die Umrechnung selbst folgt exakt demselben Muster wie "Price EUR": eine neue Spalte "Quote Total (EUR)" in der Kopfzeile des Financial-Summary-Blocks, eine echte `ROUND(<Quellzelle>/<Kurszelle>,2)`-Formel in der "Quote Total"-Zeile, dieselbe Kurs-Zelle wie überall sonst im Dokument (ein Kurs, eine Änderung in Excel aktualisiert alles).
 
 ### Zielspalte für "Price EUR": erste tatsächlich freie Spalte, nicht "Custom Name" + 1
 

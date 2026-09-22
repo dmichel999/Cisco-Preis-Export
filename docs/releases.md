@@ -2,6 +2,20 @@
 
 Format nach [Keep a Changelog](https://keepachangelog.com/de/1.0.0/), Versionierung nach [SemVer](https://semver.org/lang/de/).
 
+## [0.20.0] - 2026-09-22
+
+Ausgelöst durch eine reale Quote (EA-/Subscription-Lizenzen, z. B. ISE), bei der jede einzelne Artikelzeile `"--"`/0 in "Unit Net Price Before Credits" hat — das Tool brach seit dem Revert auf v0.9.0-Logik (siehe 0.18.0) sofort mit "Keine Artikelzeilen unterhalb der Kopfzeile gefunden" ab.
+
+### Added
+
+- **Kurs-Eingabefeld ist jetzt immer editierbar**, unabhängig von Dateiauswahl. Bisher war es bis zur Dateiauswahl `disabled` — der automatische Kursvorschlag (0.19.0) änderte daran nichts, manuelle Eingabe blieb dadurch de facto blockiert, bis eine Datei gewählt war.
+- **Quote-Total-Umrechnung:** Findet das Tool im Sheet eine Zeile mit Label "Quote Total" (Financial-Summary-Block) und eine Spalte mit Kopftext "Special Items Total", wird der dortige USD-Betrag zusätzlich in einer neuen Spalte "Quote Total (EUR)" nach EUR umgerechnet — als echte Formel mit derselben Kurs-Zelle wie "Price EUR". Rein additiv, reiner No-op, wenn einer der beiden Textanker fehlt (normale Quotes ohne diesen Block bleiben unberührt).
+
+### Fixed
+
+- Tabellenende wird wieder über die Spalte "Part Number" erkannt statt über die erste nicht-numerische/fehlende Quellzelle (siehe 0.18.0-Revert, jetzt erneut eingeführt) — diesmal isoliert nur an dieser einen Stelle geändert, alles andere (Formelerzeugung, Style-Wiederverwendung, Zell-Einfügereihenfolge) bleibt exakt auf v0.9.0/v0.18.0/v0.19.1-Stand. Eine direkte Folgekorrektur war nötig: die Preis-Formel-Zeile ging bisher blind davon aus, dass jede Artikelzeile eine Quellzelle hat — mit dem Part-Number-Anker sind jetzt wieder Zeilen ohne jede Quellzelle möglich (z. B. "Requested Start Date"-Unterzeilen), die bekommen wie vorgesehen den reinen `0,00 €`-Wert ohne Formelbezug statt eines Absturzes.
+- **Bewusst NICHT erneut eingeführt:** die volle v0.17.0-Rewrite-Diskussion (`resolveCellText`-Änderung, `insertCellInOrder` statt `appendChild`). Nur die eine, konkret verifizierte Ursache wurde behoben, um das v0.18.0-Muster (viel auf einmal ändern, am Ende kaputt) nicht zu wiederholen. Verifiziert gegen die reale ISE-Quote sowie gegen zwei synthetische Regressionsquotes (mit/ohne Pricing-Term-Spalte).
+
 ## [0.19.1] - 2026-09-22
 
 ### Fixed

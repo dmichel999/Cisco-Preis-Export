@@ -1,14 +1,18 @@
 // thought up by human, coded by ai
 'use strict';
 
-const APP_VERSION = '0.19.1';
+const APP_VERSION = '0.20.0';
 
 const HEADER_TEXT_CREDITS = 'Credits';
 const HEADER_TEXT_CUSTOM_NAME = 'Custom Name';
 const HEADER_TEXT_SOURCE_PRICE = 'Unit Net Price Before Credits';
+const HEADER_TEXT_PART_NUMBER = 'Part Number';
 const HEADER_TEXT_PRICING_TERM = 'Pricing Term (in Months)';
+const HEADER_TEXT_QUOTE_TOTAL_LABEL = 'Quote Total';
+const HEADER_TEXT_SPECIAL_ITEMS_TOTAL = 'Special Items Total';
 const NEW_COLUMN_HEADER = 'Price EUR';
 const SUBSCRIPTION_NOTE_HEADER = 'Preishinweis';
+const QUOTE_TOTAL_EUR_HEADER = 'Quote Total (EUR)';
 const HIGHLIGHT_FILL_ARGB = 'FFFFFF01';
 const EUR_NUM_FMT_CODE = '#,##0.00" €"';
 const CUSTOM_NUM_FMT_ID_BASE = 164; // custom number format IDs conventionally start at 164
@@ -236,6 +240,7 @@ function findQuoteTable(sheetDoc, sharedStrings) {
   let creditsCol = null;
   let customNameCol = null;
   let sourceCol = null;
+  let partNumberCol = null;
   let pricingTermCol = null;
   for (const c of headerRow.getElementsByTagName('c')) {
     const text = resolveCellText(c, sharedStrings);
@@ -244,11 +249,12 @@ function findQuoteTable(sheetDoc, sharedStrings) {
     if (text === HEADER_TEXT_CREDITS) creditsCol = ref.colIndex;
     else if (text === HEADER_TEXT_CUSTOM_NAME) customNameCol = ref.colIndex;
     else if (text === HEADER_TEXT_SOURCE_PRICE) sourceCol = ref.colIndex;
+    else if (text === HEADER_TEXT_PART_NUMBER) partNumberCol = ref.colIndex;
     else if (text === HEADER_TEXT_PRICING_TERM) pricingTermCol = ref.colIndex;
   }
-  if (creditsCol == null || customNameCol == null || sourceCol == null) {
+  if (creditsCol == null || customNameCol == null || sourceCol == null || partNumberCol == null) {
     throw new Error(
-      `Erwartete Spalten ("${HEADER_TEXT_CREDITS}", "${HEADER_TEXT_CUSTOM_NAME}", "${HEADER_TEXT_SOURCE_PRICE}") nicht vollständig gefunden.`
+      `Erwartete Spalten ("${HEADER_TEXT_CREDITS}", "${HEADER_TEXT_CUSTOM_NAME}", "${HEADER_TEXT_SOURCE_PRICE}", "${HEADER_TEXT_PART_NUMBER}") nicht vollständig gefunden.`
     );
   }
   // "Pricing Term (in Months)" is optional — without it, no row can be identified
@@ -256,23 +262,38 @@ function findQuoteTable(sheetDoc, sharedStrings) {
   const pricingTermLetters = pricingTermCol != null ? colIndexToLetters(pricingTermCol) : null;
 
   const sourceLetters = colIndexToLetters(sourceCol);
+  const partNumberLetters = colIndexToLetters(partNumberCol);
   const headerIndex = rows.indexOf(headerRow);
   const dataRows = [];
   for (let i = headerIndex + 1; i < rows.length; i++) {
     const row = rows[i];
     let sourceCell = null;
+    let partNumberCell = null;
     for (const c of row.getElementsByTagName('c')) {
       const ref = parseCellRef(c.getAttribute('r'));
-      if (ref && ref.letters === sourceLetters) {
-        sourceCell = c;
-        break;
+      if (!ref) continue;
+      if (ref.letters === sourceLetters) sourceCell = c;
+      else if (ref.letters === partNumberLetters) partNumberCell = c;
+    }
+    // "Part Number" is the reliable per-row anchor for "this is still an item
+    // row" — unlike the source price, which Cisco writes as a text placeholder
+    // ("--") rather than a number for lines with no allocable price of their
+    // own (e.g. EA/Subscription-Quotes, where every item row shows "--" and
+    // the real total lives in the separate "Quote Total" summary, see below).
+    const partNumberText = partNumberCell ? resolveCellText(partNumberCell, sharedStrings) : null;
+    if (!partNumberText) break;
+
+    // "Unit Net Price Before Credits" computation itself is untouched: a plain
+    // number cell is read exactly as before. A missing/textual/zero source
+    // price (e.g. the "--" placeholder) just means 0 here, not "end of table".
+    let value = 0;
+    if (sourceCell && !sourceCell.getAttribute('t')) {
+      const vEl = sourceCell.getElementsByTagName('v')[0];
+      if (vEl) {
+        const parsed = parseFloat(vEl.textContent);
+        if (!Number.isNaN(parsed)) value = parsed;
       }
     }
-    if (!sourceCell || sourceCell.getAttribute('t')) break;
-    const vEl = sourceCell.getElementsByTagName('v')[0];
-    if (!vEl) break;
-    const value = parseFloat(vEl.textContent);
-    if (Number.isNaN(value)) break;
     dataRows.push({ row, value, sourceCell });
   }
   if (dataRows.length === 0) {
@@ -298,6 +319,61 @@ function findQuoteTable(sheetDoc, sharedStrings) {
   }
 
   return { headerRow, creditsCol, customNameCol, sourceCol, dataRows };
+}
+
+// Manche Quotes (z. B. EA-/Subscription-Quotes wie ISE-Lizenzen) haben in JEDER
+// Artikelzeile "--"/0 in "Unit Net Price Before Credits" — der reale Gesamtpreis
+// steht dort nicht pro Zeile, sondern separat im "Financial Summary"-Block weiter
+// oben im Blatt, in einer Zeile mit Label "Quote Total". Komplett eigenständig von
+// findQuoteTable: sucht zwei Text-Anker über das ganze Blatt (wie "Credits" oben),
+// no-op statt Fehler, wenn eine der beiden Ankertexte fehlt (normale Quotes ohne
+// diesen Block bleiben unberührt).
+function findQuoteTotalCell(sheetDoc, sharedStrings) {
+  const sheetDataEl = sheetDoc.getElementsByTagName('sheetData')[0];
+  if (!sheetDataEl) return null;
+  const rows = Array.from(sheetDataEl.getElementsByTagName('row'));
+
+  let totalLabelRow = null;
+  let totalValueCol = null;
+  for (const row of rows) {
+    for (const c of row.getElementsByTagName('c')) {
+      if (resolveCellText(c, sharedStrings) === HEADER_TEXT_QUOTE_TOTAL_LABEL) {
+        totalLabelRow = row;
+        break;
+      }
+    }
+    if (totalLabelRow) break;
+  }
+  for (const row of rows) {
+    for (const c of row.getElementsByTagName('c')) {
+      if (resolveCellText(c, sharedStrings) === HEADER_TEXT_SPECIAL_ITEMS_TOTAL) {
+        const ref = parseCellRef(c.getAttribute('r'));
+        if (ref) totalValueCol = ref.colIndex;
+        break;
+      }
+    }
+    if (totalValueCol != null) break;
+  }
+  if (!totalLabelRow || totalValueCol == null) return null;
+
+  const totalValueLetters = colIndexToLetters(totalValueCol);
+  let sourceCell = null;
+  for (const c of totalLabelRow.getElementsByTagName('c')) {
+    const ref = parseCellRef(c.getAttribute('r'));
+    if (ref && ref.letters === totalValueLetters) {
+      sourceCell = c;
+      break;
+    }
+  }
+  // Nur eine plain-numerische Zelle taugt als Quelle — sonst bleibt das Feature
+  // stiller No-op statt eines falschen/geratenen Werts.
+  if (!sourceCell || sourceCell.getAttribute('t')) return null;
+  const vEl = sourceCell.getElementsByTagName('v')[0];
+  if (!vEl) return null;
+  const value = parseFloat(vEl.textContent);
+  if (Number.isNaN(value)) return null;
+
+  return { row: totalLabelRow, sourceCell, value };
 }
 
 async function addHighlightStyles(zip, baseHeaderStyleId, baseDataStyleId) {
@@ -421,7 +497,11 @@ async function processFile(file, rate) {
     (c) => resolveCellText(c, sharedStrings) === HEADER_TEXT_CREDITS
   );
   const headerStyle = creditsHeaderCell ? creditsHeaderCell.getAttribute('s') : null;
-  const dataStyle = dataRows[0].sourceCell.getAttribute('s');
+  // Not necessarily dataRows[0] — a row can lack a source cell entirely (e.g. a
+  // "Requested Start Date" sub-line with no price column at all), so find the
+  // first row that actually has one to base the highlighted style on.
+  const styleSourceCell = dataRows.find((d) => d.sourceCell)?.sourceCell;
+  const dataStyle = styleSourceCell ? styleSourceCell.getAttribute('s') : null;
 
   const {
     headerStyleId: yellowHeaderStyle,
@@ -486,13 +566,17 @@ async function processFile(file, rate) {
   bumpRowSpans(headerRow, newColIndex);
 
   // New data cells — a real formula referencing the rate cell when available,
-  // so changing the rate in Excel recalculates every price automatically.
+  // so changing the rate in Excel recalculates every price automatically. A
+  // formula is only added when there's an actual source cell to reference; rows
+  // without one (e.g. a "Requested Start Date" sub-line with no price column at
+  // all — possible again now that the table end is anchored on "Part Number"
+  // instead of the source cell, see findQuoteTable) get the plain value.
   for (const { row, value, sourceCell } of dataRows) {
     const eur = roundToCents(value / rate);
     const cell = sheetDoc.createElementNS(NS, 'c');
     cell.setAttribute('r', `${newColLetters}${row.getAttribute('r')}`);
     cell.setAttribute('s', yellowDataStyle);
-    if (rateCellRef) {
+    if (rateCellRef && sourceCell) {
       const fEl = sheetDoc.createElementNS(NS, 'f');
       fEl.textContent = `ROUND(${sourceCell.getAttribute('r')}/${rateCellRef},2)`;
       cell.appendChild(fEl);
@@ -550,6 +634,59 @@ async function processFile(file, rate) {
     }
   }
 
+  // Quote-Total-Umrechnung — komplett eigenständig von der Artikeltabelle oben,
+  // rein additiv. Manche Quotes (z. B. EA-/Subscription-Quotes) haben in JEDER
+  // Artikelzeile "--"/0 in "Unit Net Price Before Credits"; der reale Gesamtpreis
+  // steht dort separat im "Financial Summary"-Block ("Quote Total"-Zeile). Nutzt
+  // dieselbe Kurs-Zelle/Formel wie "Price EUR" oben, no-op wenn keine der beiden
+  // Textanker (siehe findQuoteTotalCell) gefunden wird.
+  const quoteTotalCell = findQuoteTotalCell(sheetDoc, sharedStrings);
+  if (quoteTotalCell) {
+    const { row: totalRow, sourceCell: totalSourceCell, value: totalValue } = quoteTotalCell;
+    let totalHeaderRow = null;
+    for (const row of Array.from(sheetDataEl.getElementsByTagName('row'))) {
+      for (const c of row.getElementsByTagName('c')) {
+        if (resolveCellText(c, sharedStrings) === HEADER_TEXT_SPECIAL_ITEMS_TOTAL) {
+          totalHeaderRow = row;
+          break;
+        }
+      }
+      if (totalHeaderRow) break;
+    }
+    const totalRowsToCheck = totalHeaderRow ? [totalHeaderRow, totalRow] : [totalRow];
+    const totalSourceColIndex = parseCellRef(totalSourceCell.getAttribute('r')).colIndex;
+    const totalColIndex = findFirstFreeColumn(totalSourceColIndex + 1, totalRowsToCheck);
+    const totalColLetters = colIndexToLetters(totalColIndex);
+
+    if (totalHeaderRow) {
+      const totalHeaderCell = sheetDoc.createElementNS(NS, 'c');
+      totalHeaderCell.setAttribute('r', `${totalColLetters}${totalHeaderRow.getAttribute('r')}`);
+      totalHeaderCell.setAttribute('s', yellowHeaderStyle);
+      totalHeaderCell.setAttribute('t', 'inlineStr');
+      const totalHeaderIsEl = sheetDoc.createElementNS(NS, 'is');
+      const totalHeaderTextEl = sheetDoc.createElementNS(NS, 't');
+      totalHeaderTextEl.textContent = QUOTE_TOTAL_EUR_HEADER;
+      totalHeaderIsEl.appendChild(totalHeaderTextEl);
+      totalHeaderCell.appendChild(totalHeaderIsEl);
+      totalHeaderRow.appendChild(totalHeaderCell);
+      bumpRowSpans(totalHeaderRow, totalColIndex);
+    }
+
+    const totalEurCell = sheetDoc.createElementNS(NS, 'c');
+    totalEurCell.setAttribute('r', `${totalColLetters}${totalRow.getAttribute('r')}`);
+    totalEurCell.setAttribute('s', yellowDataStyle);
+    if (rateCellRef) {
+      const fEl = sheetDoc.createElementNS(NS, 'f');
+      fEl.textContent = `ROUND(${totalSourceCell.getAttribute('r')}/${rateCellRef},2)`;
+      totalEurCell.appendChild(fEl);
+    }
+    const totalVEl = sheetDoc.createElementNS(NS, 'v');
+    totalVEl.textContent = String(roundToCents(totalValue / rate));
+    totalEurCell.appendChild(totalVEl);
+    totalRow.appendChild(totalEurCell);
+    bumpRowSpans(totalRow, totalColIndex);
+  }
+
   // Hide every column between "Credits" and the new "Price EUR" column — not just
   // up to "Custom Name" — so any extra columns Cisco has inserted in between (e.g.
   // "BPA No Subscription Line", which is why newColIndex may sit past customNameCol
@@ -604,7 +741,7 @@ async function processFile(file, rate) {
     mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
     compression: 'DEFLATE',
   });
-  return { blob, rateCellRef, subscriptionNoteCount: subscriptionRows.length };
+  return { blob, rateCellRef, subscriptionNoteCount: subscriptionRows.length, quoteTotalConverted: !!quoteTotalCell };
 }
 
 async function downloadResult(blob, filename) {
@@ -718,7 +855,7 @@ function initUI() {
         throw new Error('Bitte einen gültigen, positiven Umrechnungskurs eingeben.');
       }
       setStatus('Verarbeite Datei…', null);
-      const { blob, rateCellRef, subscriptionNoteCount } = await processFile(selectedFile, rate);
+      const { blob, rateCellRef, subscriptionNoteCount, quoteTotalConverted } = await processFile(selectedFile, rate);
       setStatus('Speichere Datei…', null);
       const result = await downloadResult(blob, selectedFile.name);
       if (result === 'cancelled') {
@@ -729,7 +866,8 @@ function initUI() {
           : '';
         const noteHint =
           subscriptionNoteCount > 0 ? ` ${subscriptionNoteCount} Subscription-Zeile(n) mit Hinweis versehen.` : '';
-        setStatus(`Fertig — Spalte "${NEW_COLUMN_HEADER}" mit Kurs ${rate} ergänzt.${rateHint}${noteHint}`, 'success');
+        const totalHint = quoteTotalConverted ? ` "${QUOTE_TOTAL_EUR_HEADER}" ergänzt.` : '';
+        setStatus(`Fertig — Spalte "${NEW_COLUMN_HEADER}" mit Kurs ${rate} ergänzt.${rateHint}${noteHint}${totalHint}`, 'success');
       }
     } catch (err) {
       console.error(err);
