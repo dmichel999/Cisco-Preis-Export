@@ -1,11 +1,12 @@
 // thought up by human, coded by ai
 'use strict';
 
-const APP_VERSION = '0.20.1';
+const APP_VERSION = '0.21.0';
 
 const HEADER_TEXT_CREDITS = 'Credits';
 const HEADER_TEXT_CUSTOM_NAME = 'Custom Name';
 const HEADER_TEXT_SOURCE_PRICE = 'Unit Net Price Before Credits';
+const HEADER_TEXT_UNIT_NET_PRICE = 'Unit Net Price';
 const HEADER_TEXT_PART_NUMBER = 'Part Number';
 const HEADER_TEXT_PRICING_TERM = 'Pricing Term (in Months)';
 const HEADER_TEXT_QUOTE_TOTAL_LABEL = 'Quote Total';
@@ -256,6 +257,7 @@ function findQuoteTable(sheetDoc, sharedStrings) {
   let creditsCol = null;
   let customNameCol = null;
   let sourceCol = null;
+  let unitNetPriceCol = null;
   let partNumberCol = null;
   let pricingTermCol = null;
   for (const c of headerRow.getElementsByTagName('c')) {
@@ -265,6 +267,7 @@ function findQuoteTable(sheetDoc, sharedStrings) {
     if (text === HEADER_TEXT_CREDITS) creditsCol = ref.colIndex;
     else if (text === HEADER_TEXT_CUSTOM_NAME) customNameCol = ref.colIndex;
     else if (text === HEADER_TEXT_SOURCE_PRICE) sourceCol = ref.colIndex;
+    else if (text === HEADER_TEXT_UNIT_NET_PRICE) unitNetPriceCol = ref.colIndex;
     else if (text === HEADER_TEXT_PART_NUMBER) partNumberCol = ref.colIndex;
     else if (text === HEADER_TEXT_PRICING_TERM) pricingTermCol = ref.colIndex;
   }
@@ -273,9 +276,13 @@ function findQuoteTable(sheetDoc, sharedStrings) {
       `Erwartete Spalten ("${HEADER_TEXT_CREDITS}", "${HEADER_TEXT_CUSTOM_NAME}", "${HEADER_TEXT_SOURCE_PRICE}", "${HEADER_TEXT_PART_NUMBER}") nicht vollständig gefunden.`
     );
   }
-  // "Pricing Term (in Months)" is optional — without it, no row can be identified
-  // as a subscription line, and the note column below stays a no-op.
+  // "Pricing Term (in Months)" and "Unit Net Price" are optional — without
+  // "Pricing Term (in Months)", no row can be identified as a subscription line
+  // (note column below stays a no-op, and every row keeps using "Unit Net Price
+  // Before Credits" as before). Without "Unit Net Price", subscription rows fall
+  // back to 0 instead of erroring.
   const pricingTermLetters = pricingTermCol != null ? colIndexToLetters(pricingTermCol) : null;
+  const unitNetPriceLetters = unitNetPriceCol != null ? colIndexToLetters(unitNetPriceCol) : null;
 
   const sourceLetters = colIndexToLetters(sourceCol);
   const partNumberLetters = colIndexToLetters(partNumberCol);
@@ -284,12 +291,16 @@ function findQuoteTable(sheetDoc, sharedStrings) {
   for (let i = headerIndex + 1; i < rows.length; i++) {
     const row = rows[i];
     let sourceCell = null;
+    let unitNetPriceCell = null;
     let partNumberCell = null;
+    let pricingTermCell = null;
     for (const c of row.getElementsByTagName('c')) {
       const ref = parseCellRef(c.getAttribute('r'));
       if (!ref) continue;
       if (ref.letters === sourceLetters) sourceCell = c;
+      else if (unitNetPriceLetters && ref.letters === unitNetPriceLetters) unitNetPriceCell = c;
       else if (ref.letters === partNumberLetters) partNumberCell = c;
+      else if (pricingTermLetters && ref.letters === pricingTermLetters) pricingTermCell = c;
     }
     // "Part Number" is the reliable per-row anchor for "this is still an item
     // row" — unlike the source price, which Cisco writes as a text placeholder
@@ -299,39 +310,29 @@ function findQuoteTable(sheetDoc, sharedStrings) {
     const partNumberText = partNumberCell ? resolveCellText(partNumberCell, sharedStrings) : null;
     if (!partNumberText) break;
 
-    // "Unit Net Price Before Credits" computation itself is untouched: a plain
-    // number cell is read exactly as before. A missing/textual/zero source
-    // price (e.g. the "--" placeholder) just means 0 here, not "end of table".
+    const pricingTermMonths = resolvePricingTermMonths(pricingTermCell, sharedStrings);
+
+    // Subscription-Lizenzen (Pricing Term (in Months) >= 1) tragen ihren Preis
+    // in "Unit Net Price" statt in "Unit Net Price Before Credits" — bei diesen
+    // Quotes steht dort durchgängig "--". Einmalkauf-Zeilen (kein Pricing Term)
+    // nutzen weiterhin unverändert "Unit Net Price Before Credits".
+    const priceCell = pricingTermMonths > 0 && unitNetPriceCell ? unitNetPriceCell : sourceCell;
+
+    // Die Wertermittlung selbst bleibt unverändert: eine plain-numerische Zelle
+    // wird gelesen wie bisher; eine fehlende/textuelle Quellzelle (z. B. "--")
+    // ergibt 0 statt eines Abbruchs.
     let value = 0;
-    if (sourceCell && !sourceCell.getAttribute('t')) {
-      const vEl = sourceCell.getElementsByTagName('v')[0];
+    if (priceCell && !priceCell.getAttribute('t')) {
+      const vEl = priceCell.getElementsByTagName('v')[0];
       if (vEl) {
         const parsed = parseFloat(vEl.textContent);
         if (!Number.isNaN(parsed)) value = parsed;
       }
     }
-    dataRows.push({ row, value, sourceCell });
+    dataRows.push({ row, value, sourceCell: priceCell, pricingTermMonths });
   }
   if (dataRows.length === 0) {
     throw new Error('Keine Artikelzeilen unterhalb der Kopfzeile gefunden.');
-  }
-
-  // Subscription-Hinweis-Feature: separater, additiver Durchlauf über die bereits
-  // feststehenden dataRows (Erkennung/Endekriterium oben bleibt unangetastet). Jede
-  // Zeile bekommt zusätzlich ihren "Pricing Term (in Months)"-Wert, falls die Spalte
-  // im Export vorhanden ist.
-  if (pricingTermLetters) {
-    for (const dataRow of dataRows) {
-      let pricingTermCell = null;
-      for (const c of dataRow.row.getElementsByTagName('c')) {
-        const ref = parseCellRef(c.getAttribute('r'));
-        if (ref && ref.letters === pricingTermLetters) {
-          pricingTermCell = c;
-          break;
-        }
-      }
-      dataRow.pricingTermMonths = resolvePricingTermMonths(pricingTermCell, sharedStrings);
-    }
   }
 
   return { headerRow, creditsCol, customNameCol, sourceCol, dataRows };

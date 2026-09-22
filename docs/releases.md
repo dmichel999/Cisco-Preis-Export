@@ -2,6 +2,14 @@
 
 Format nach [Keep a Changelog](https://keepachangelog.com/de/1.0.0/), Versionierung nach [SemVer](https://semver.org/lang/de/).
 
+## [0.21.0] - 2026-09-22
+
+Bei der realen ISE-Quote zeigte "Price EUR" trotz des 0.20.x-Fixes weiterhin überall `0,00 €` — auch bei den Subscription-Zeilen, für die der User einen echten Preis erwartete.
+
+### Changed
+
+- **Preisquelle hängt jetzt vom Zeilentyp ab.** Subscription-Zeilen (erkannt über "Pricing Term (in Months)" ≥ 1) nutzen "Unit Net Price" als Quelle statt "Unit Net Price Before Credits" — bei diesen Quotes steht dort durchgängig `"--"`, der reale (Monats-)Preis steht stattdessen in "Unit Net Price". Einmalkauf-Zeilen (kein Pricing Term) nutzen unverändert "Unit Net Price Before Credits" wie bisher. Fehlt die Spalte "Unit Net Price" im Export komplett, fällt eine Subscription-Zeile auf "Unit Net Price Before Credits" zurück (bisheriges Verhalten, kein Fehler). Verifiziert gegen die reale Quote: 6 Subscription-Zeilen bekommen jetzt echte Beträge (z. B. `0,72 €`, `3,38 €`) statt `0,00 €`, die 5 Einmalkauf-Zeilen bleiben unverändert bei "Unit Net Price Before Credits".
+
 ## [0.20.1] - 2026-09-22
 
 Direkt beim ersten Test der v0.20.0-Ausgabedatei durch den User zeigte Excel den "Reparieren"-Dialog ("Wir haben ein Problem bei einigen Inhalten erkannt").

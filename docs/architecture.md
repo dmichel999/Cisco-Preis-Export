@@ -29,13 +29,21 @@ Reale Quotes können in "Unit Net Price Before Credits" einen Text-Platzhalter (
 
 Das Tabellenende wird deshalb über die Spalte "Part Number" erkannt — jede echte Artikelzeile (auch eine ohne eigenen Preis) hat dort einen Wert. **Die Berechnung von "Price EUR" selbst ändert sich dadurch nicht** — sie bleibt exakt `ROUND(<Quellzelle>/Kurs,2)`; eine fehlende/textuelle/`0`-Quellzelle ergibt weiterhin `0,00 €` statt eines Abbruchs. Eine Zeile ganz ohne Quellzelle (z. B. eine "Requested Start Date"-Unterzeile ohne eigene Preisspalte) bekommt ihren `0,00 €`-Wert ohne Formelbezug.
 
+### Preisquelle pro Zeile: "Unit Net Price" für Subscription-Zeilen (0.21.0)
+
+Bei EA-/Subscription-Quotes (z. B. Cisco-ISE-Lizenzen) steht in "Unit Net Price Before Credits" für **jede** Artikelzeile `"--"` — nicht nur bei einzelnen Bundle-Kindzeilen. Der reale (Monats-)Preis solcher Zeilen steht stattdessen in der Spalte "Unit Net Price". Für Einmalkauf-Zeilen ist es umgekehrt: dort ist "Unit Net Price Before Credits" die korrekte, befüllte Quelle.
+
+Die Quellzelle wird deshalb pro Zeile anhand von "Pricing Term (in Months)" gewählt: eine Zahl ≥ 1 markiert eine Subscription-Zeile → Quelle ist "Unit Net Price"; leer/0/nicht vorhanden → Einmalkauf-Zeile → Quelle bleibt "Unit Net Price Before Credits" wie ursprünglich. Ist "Unit Net Price" im Export gar nicht vorhanden, fällt eine Subscription-Zeile auf "Unit Net Price Before Credits" zurück (identisch zum bisherigen Verhalten) statt eines Fehlers.
+
+Die gewählte Quellzelle wird in `dataRow.sourceCell` abgelegt — dieselbe Zelle, auf die später sowohl die "Price EUR"-Formel (`ROUND(<sourceCell>/Kurs,2)`) als auch, für Subscription-Zeilen, der "Preishinweis"-Text (via `dataRow.value`) verweisen. Beide Features mussten dadurch nicht selbst angepasst werden.
+
 **Zweiter Anlauf, diesmal isoliert:** Ein erster Fix-Versuch am 18.09.2026 hat dieselbe Idee mit mehreren anderen, nicht getesteten Änderungen (`resolveCellText`-Erweiterung, sortierte Zell-Einfüge-Reihenfolge statt `appendChild`) in einem Rutsch gebündelt — das Ergebnis war in der Praxis kaputt und wurde am 22.09.2026 komplett zurückgenommen (siehe Release 0.18.0). Der jetzige Fix (0.20.0) ändert **ausschließlich** das Tabellenende-Kriterium plus eine direkt daraus folgende Absicherung (Formel-Zelle nur bei vorhandener Quellzelle — ohne die kann's jetzt wieder Zeilen ganz ohne Quellzelle geben), sonst nichts. Verifiziert gegen eine reale EA-Quote sowie zwei synthetische Regressions-Quotes.
 
 ### Subscription-Hinweis: eigene Spalte statt Text in der Preis-Zelle
 
 Ist "Pricing Term (in Months)" für eine Zeile eine Zahl > 0 (Subscription-Lizenz statt Einmalkauf), bekommt sie eine zusätzliche Zelle in einer neuen Spalte direkt hinter "Price EUR" mit dem Text "Der Einzelpreis pro X Monate = Y". Der Hinweistext landet bewusst in einer **eigenen Spalte**, nicht in der "Price EUR"-Zelle selbst: Diese trägt eine echte Formel (siehe oben) — würde man dort zusätzlich Text anhängen, müsste die Zelle zu einem festen Textwert werden und die Formel (und damit die automatische Neuberechnung bei Kursänderung) ginge verloren.
 
-**Y ist exakt der für diese Zeile bereits berechnete "Price EUR"-Wert** — keine andere Spalte (insbesondere nicht "Unit List Price") wird dafür herangezogen. "Unit Net Price Before Credits" bleibt so für jede Zeile die alleinige Quelle, unabhängig davon, ob es sich um eine Subscription-Zeile handelt.
+**Y ist exakt der für diese Zeile bereits berechnete "Price EUR"-Wert** — keine andere Spalte (insbesondere nicht "Unit List Price") wird eigens dafür herangezogen. Die Quellzelle dahinter ist bei Subscription-Zeilen seit 0.21.0 "Unit Net Price" statt "Unit Net Price Before Credits" (siehe oben) — für den Hinweistext selbst ändert das nichts, Y bleibt einfach der bereits berechnete Wert.
 
 Die neue Spalte wird wie "Price EUR" per `findFirstFreeColumn` ermittelt (ausgehend von der Spalte direkt nach "Price EUR"), damit sie nicht mit weiteren, künftig von Cisco eingefügten Spalten kollidiert. Sie entsteht nur, wenn mindestens eine Zeile der Quote tatsächlich eine Subscription-Lizenz ist — ist die Spalte "Pricing Term (in Months)" im Export gar nicht vorhanden, bleibt das Feature ein stiller No-op statt eines Fehlers.
 
