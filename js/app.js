@@ -1,7 +1,7 @@
 // thought up by human, coded by ai
 'use strict';
 
-const APP_VERSION = '0.19.0';
+const APP_VERSION = '0.19.1';
 
 const HEADER_TEXT_CREDITS = 'Credits';
 const HEADER_TEXT_CUSTOM_NAME = 'Custom Name';
@@ -136,7 +136,7 @@ function formatDateDE(date) {
 // das blockt automatisierte Zugriffe hart per Akamai-Bot-Schutz (403 "Access
 // Denied", auch mit regulärem Browser-User-Agent). Nur ein GET auf eine
 // öffentliche Kurs-API, keine Quote-/Kundendaten verlassen dabei den Browser.
-const FX_API_URL = 'https://api.frankfurter.app/latest?from=EUR&to=USD';
+const FX_API_URL = 'https://api.frankfurter.dev/v1/latest?from=EUR&to=USD';
 
 async function fetchEurUsdRate() {
   let res;

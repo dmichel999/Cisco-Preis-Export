@@ -2,6 +2,12 @@
 
 Format nach [Keep a Changelog](https://keepachangelog.com/de/1.0.0/), Versionierung nach [SemVer](https://semver.org/lang/de/).
 
+## [0.19.1] - 2026-09-22
+
+### Fixed
+
+- `api.frankfurter.app` (die in 0.19.0 verwendete Domain) leitet per 301 auf `api.frankfurter.dev` um — mit dieser CSP-Lücke (Redirect-Ziel nicht in `connect-src`) schlug der automatische Kursabruf mit "Load failed" fehl, sowohl unter `file://` als auch über GitHub Pages (https). Tool ruft jetzt direkt `api.frankfurter.dev/v1/...` auf, CSP entsprechend angepasst. Live gegen GitHub Pages + lokalen HTTP-Server verifiziert (Safari, kein file://-Sonderfall).
+
 ## [0.19.0] - 2026-09-22
 
 ### Added
