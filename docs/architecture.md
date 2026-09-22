@@ -61,6 +61,14 @@ Seit v0.8.0 wird die Zielspalte stattdessen zur Laufzeit gesucht (`findFirstFree
 
 Seit v0.9.0 reicht der Ausblende-Bereich (`<col hidden="1">`) entsprechend bis `newColIndex - 1`, nicht mehr nur bis `customNameCol`. Damit verschwinden auch Zwischenspalten wie "BPA No Subscription Line" automatisch mit, und "Price EUR" folgt visuell direkt auf die USD-Preisspalte — unabhängig davon, wie viele zusätzliche Spalten Cisco zwischen "Custom Name" und der tatsächlich freien Spalte einfügt.
 
+### Neue Zellen müssen an sortierter Position eingefügt werden, nicht angehängt (0.20.1)
+
+OOXML verlangt, dass `<c>`-Elemente innerhalb einer `<row>` in aufsteigender Spaltenreihenfolge stehen. Neue Zellen per `appendChild` immer ans Zeilenende zu hängen bricht, sobald *nach* der neu eingefügten Spalte noch eine weitere, bereits vorhandene Zelle mit Inhalt in derselben Zeile steht (z. B. eine Cisco-eigene Berechnungsspalte, oder — real aufgetreten — eine Störzelle aus einem früheren, nicht abgeschlossenen Verarbeitungsversuch derselben Datei) — Excel zeigt dann beim Öffnen den Reparieren-Dialog ("Wir haben ein Problem bei einigen Inhalten erkannt").
+
+`insertCellInOrder(rowEl, cellEl, colIndex)` übernimmt deshalb jedes Einfügen einer neuen `<c>`-Zelle in eine bestehende `<row>` (Kurs-Zelle, Datums-Zelle, Kopfzellen, Preis-/Preishinweis-/Quote-Total-Datenzellen): Es sucht die erste vorhandene Zelle mit größerem Spaltenindex und fügt per `insertBefore` davor ein, statt blind anzuhängen.
+
+**Historie:** Dieselbe Lösung war bereits Teil des am 22.09.2026 verworfenen v0.17.0-Anlaufs, wurde beim Revert auf v0.9.0-Kernlogik (0.18.0) aber pauschal mitentfernt, weil unklar war, ob sie zur damaligen Regression beigetragen hatte. Direkt beim ersten Test von v0.20.0 (Part-Number-Anker-Fix, siehe oben) gegen eine reale Quote trat der Reparieren-Dialog tatsächlich auf — diesmal mit konkretem Reproduktionsfall verifiziert (alle 61 Zeilen der realen Datei nach dem Fix korrekt aufsteigend sortiert), reine Struktur-Änderung ohne Auswirkung auf berechnete Werte oder Formeln.
+
 ## Style-Wiederverwendung + gezielte Style-Ergänzungen
 
 Basis-Styles werden von bestehenden `cellXfs`-Einträgen übernommen (Kopfzeile: gleicher Style wie andere rechtsbündige Preis-Header, Datenzeilen: gleicher Style wie Spalte O — Format `#,##0.00`) und per `cloneNode(true)` dupliziert. Für die gewünschte gelbe Hervorhebung (`#FFFF01`) wird auf dem Klon zusätzlich `fillId` (Verweis auf einen neu angelegten `<fill>`) und `applyFill="1"` gesetzt. Das bestehende Basis-`xf` selbst bleibt unverändert — nur der neue, angehängte Klon bekommt die Füllung. `fills`- und `cellXfs`-`count`-Attribute werden nach dem Anhängen neu berechnet (`getElementsByTagName(...).length`), damit sie nicht per Hand nachgeführt werden müssen und nicht aus dem Ruder laufen können.

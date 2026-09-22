@@ -1,7 +1,7 @@
 // thought up by human, coded by ai
 'use strict';
 
-const APP_VERSION = '0.20.0';
+const APP_VERSION = '0.20.1';
 
 const HEADER_TEXT_CREDITS = 'Credits';
 const HEADER_TEXT_CUSTOM_NAME = 'Custom Name';
@@ -124,6 +124,22 @@ function findFirstFreeColumn(startCol, rowEls) {
   let col = startCol;
   while (rowEls.some((rowEl) => isColumnOccupied(rowEl, col))) col++;
   return col;
+}
+
+// OOXML requires <c> elements within a <row> to appear in ascending column order.
+// Our new columns aren't always the last one in the row — some real exports have
+// further columns after the insertion point (e.g. a leftover cell from an earlier,
+// incomplete processing run, or a Cisco-added column) — so a plain appendChild
+// would put the new cell after those, producing a file Excel flags as needing
+// "repair". This inserts it at the correct sorted position instead. Reproduced and
+// verified against a real quote with a stray leftover cell (see docs/bugs.md).
+function insertCellInOrder(rowEl, cellEl, colIndex) {
+  const nextCell = Array.from(rowEl.getElementsByTagName('c')).find((c) => {
+    const ref = parseCellRef(c.getAttribute('r'));
+    return ref && ref.colIndex > colIndex;
+  });
+  if (nextCell) rowEl.insertBefore(cellEl, nextCell);
+  else rowEl.appendChild(cellEl);
 }
 
 function roundToCents(value) {
@@ -523,7 +539,7 @@ async function processFile(file, rate) {
     const rateValueEl = sheetDoc.createElementNS(NS, 'v');
     rateValueEl.textContent = String(rate);
     rateCell.appendChild(rateValueEl);
-    rateRow.appendChild(rateCell);
+    insertCellInOrder(rateRow, rateCell, newColIndex);
     bumpRowSpans(rateRow, newColIndex);
   }
 
@@ -549,7 +565,7 @@ async function processFile(file, rate) {
     dateTextEl.textContent = formatDateDE(new Date());
     dateIsEl.appendChild(dateTextEl);
     dateCell.appendChild(dateIsEl);
-    dateRow.appendChild(dateCell);
+    insertCellInOrder(dateRow, dateCell, newColIndex);
   }
 
   // New header cell
@@ -562,7 +578,7 @@ async function processFile(file, rate) {
   headerTextEl.textContent = NEW_COLUMN_HEADER;
   isEl.appendChild(headerTextEl);
   headerCell.appendChild(isEl);
-  headerRow.appendChild(headerCell);
+  insertCellInOrder(headerRow, headerCell, newColIndex);
   bumpRowSpans(headerRow, newColIndex);
 
   // New data cells — a real formula referencing the rate cell when available,
@@ -584,7 +600,7 @@ async function processFile(file, rate) {
     const vEl = sheetDoc.createElementNS(NS, 'v');
     vEl.textContent = String(eur);
     cell.appendChild(vEl);
-    row.appendChild(cell);
+    insertCellInOrder(row, cell, newColIndex);
     bumpRowSpans(row, newColIndex);
   }
 
@@ -613,7 +629,7 @@ async function processFile(file, rate) {
     noteHeaderTextEl.textContent = SUBSCRIPTION_NOTE_HEADER;
     noteHeaderIsEl.appendChild(noteHeaderTextEl);
     noteHeaderCell.appendChild(noteHeaderIsEl);
-    headerRow.appendChild(noteHeaderCell);
+    insertCellInOrder(headerRow, noteHeaderCell, noteColIndex);
     bumpRowSpans(headerRow, noteColIndex);
 
     for (const { row, value, pricingTermMonths } of subscriptionRows) {
@@ -629,7 +645,7 @@ async function processFile(file, rate) {
       noteTextEl.textContent = `Der Einzelpreis pro ${months} Monate = ${eurFormatted}`;
       noteIsEl.appendChild(noteTextEl);
       noteCell.appendChild(noteIsEl);
-      row.appendChild(noteCell);
+      insertCellInOrder(row, noteCell, noteColIndex);
       bumpRowSpans(row, noteColIndex);
     }
   }
@@ -668,7 +684,7 @@ async function processFile(file, rate) {
       totalHeaderTextEl.textContent = QUOTE_TOTAL_EUR_HEADER;
       totalHeaderIsEl.appendChild(totalHeaderTextEl);
       totalHeaderCell.appendChild(totalHeaderIsEl);
-      totalHeaderRow.appendChild(totalHeaderCell);
+      insertCellInOrder(totalHeaderRow, totalHeaderCell, totalColIndex);
       bumpRowSpans(totalHeaderRow, totalColIndex);
     }
 
@@ -683,7 +699,7 @@ async function processFile(file, rate) {
     const totalVEl = sheetDoc.createElementNS(NS, 'v');
     totalVEl.textContent = String(roundToCents(totalValue / rate));
     totalEurCell.appendChild(totalVEl);
-    totalRow.appendChild(totalEurCell);
+    insertCellInOrder(totalRow, totalEurCell, totalColIndex);
     bumpRowSpans(totalRow, totalColIndex);
   }
 
@@ -921,6 +937,10 @@ function bindRateAutoFetch(rateInput, rateRefreshButton, rateFetchStatus) {
   }
 
   rateRefreshButton.addEventListener('click', loadRate);
+  // Manuelle Eingabe macht den "automatisch geladen"-Hinweis unzutreffend — nur
+  // echte Nutzereingaben lösen 'input' aus, das programmatische Setzen von
+  // rateInput.value oben in loadRate() nicht, daher kein Konflikt.
+  rateInput.addEventListener('input', () => setRateFetchStatus('', null));
   loadRate();
 }
 

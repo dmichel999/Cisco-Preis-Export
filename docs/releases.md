@@ -2,6 +2,19 @@
 
 Format nach [Keep a Changelog](https://keepachangelog.com/de/1.0.0/), Versionierung nach [SemVer](https://semver.org/lang/de/).
 
+## [0.20.1] - 2026-09-22
+
+Direkt beim ersten Test der v0.20.0-Ausgabedatei durch den User zeigte Excel den "Reparieren"-Dialog ("Wir haben ein Problem bei einigen Inhalten erkannt").
+
+### Fixed
+
+- **Excel-Reparieren-Dialog bei der realen ISE-Quote.** Diese enthielt eine Störzelle (`AG40`, Rest eines früheren, nicht abgeschlossenen Verarbeitungsversuchs) direkt hinter der neuen "Price EUR"-Spalte. Neue Zellen wurden per `appendChild` immer ans Zeilenende gehängt statt an ihre sortierte Position — bei einer bereits vorhandenen Zelle mit höherem Spaltenindex direkt dahinter verletzte das die von OOXML geforderte aufsteigende `<c>`-Reihenfolge innerhalb einer `<row>`. `insertCellInOrder` (identisch zur Lösung aus dem verworfenen v0.17.0-Anlauf, diesmal isoliert und gegen die reale Datei verifiziert: alle 61 Zeilen jetzt korrekt sortiert) ersetzt jetzt jedes `row.appendChild(cell)` im ganzen Tool.
+- **Kurs-Eingabefeld war weiterhin bis zur Dateiauswahl `disabled`** (Rest aus der Zeit vor dem automatischen Kursvorschlag) — jetzt immer editierbar.
+
+### Added
+
+- Manuelle Änderung des Kurs-Felds löscht jetzt den "Kurs automatisch geladen…"-Hinweis darunter (der sonst nach einer manuellen Anpassung irreführend stehen bliebe). Der Refresh-Button zum erneuten Laden des aktuellen Kurses existiert bereits seit 0.19.0 (Icon neben dem Kurs-Feld).
+
 ## [0.20.0] - 2026-09-22
 
 Ausgelöst durch eine reale Quote (EA-/Subscription-Lizenzen, z. B. ISE), bei der jede einzelne Artikelzeile `"--"`/0 in "Unit Net Price Before Credits" hat — das Tool brach seit dem Revert auf v0.9.0-Logik (siehe 0.18.0) sofort mit "Keine Artikelzeilen unterhalb der Kopfzeile gefunden" ab.
