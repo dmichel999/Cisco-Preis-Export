@@ -2,6 +2,12 @@
 
 Format nach [Keep a Changelog](https://keepachangelog.com/de/1.0.0/), Versionierung nach [SemVer](https://semver.org/lang/de/).
 
+## [0.22.1] - 2026-09-22
+
+### Fixed
+
+- **`#WERT!`-Fehler in Excel bei Einmalkauf-Zeilen ohne Preis.** Eine Zeile ohne Pricing Term (Einmalkauf), deren "Unit Net Price Before Credits" `"--"` statt einer Zahl enthält (z. B. in einer gemischten Quote mit Subscription-*und*-Einmalkauf-Zeilen), bekam trotzdem eine Formel `ROUND(<Zelle>/Kurs,2)` — Text durch eine Zahl geteilt ergibt in Excel beim Öffnen `#WERT!` und überschreibt den korrekt gecachten `0,00 €`-Wert. Eine Formel wird jetzt nur noch bei einer tatsächlich plain-numerischen Quellzelle erzeugt; nicht-numerische/fehlende Quellzellen bekommen den reinen Wert ohne Formelbezug, exakt wie Zeilen ganz ohne Quellzelle (z. B. "Requested Start Date"-Unterzeilen). Verifiziert gegen eine reale Quote, die genau diese Kombination (Hardware- *und* Subscription-Zeilen in einer Datei) enthält.
+
 ## [0.22.0] - 2026-09-22
 
 Beim Test mit einer schon einmal verarbeiteten Datei lagen zwei Spalten Platz zwischen "Price EUR" und "Preishinweis" — die Suche nach einer freien Spalte für "Preishinweis" ist an alten, bereits belegten Spalten aus früheren Durchläufen vorbeigelaufen.

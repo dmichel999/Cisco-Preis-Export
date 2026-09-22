@@ -1,7 +1,7 @@
 // thought up by human, coded by ai
 'use strict';
 
-const APP_VERSION = '0.22.0';
+const APP_VERSION = '0.22.1';
 
 const HEADER_TEXT_CREDITS = 'Credits';
 const HEADER_TEXT_CUSTOM_NAME = 'Custom Name';
@@ -629,16 +629,21 @@ async function processFile(file, rate) {
 
   // New data cells — a real formula referencing the rate cell when available,
   // so changing the rate in Excel recalculates every price automatically. A
-  // formula is only added when there's an actual source cell to reference; rows
-  // without one (e.g. a "Requested Start Date" sub-line with no price column at
-  // all — possible again now that the table end is anchored on "Part Number"
-  // instead of the source cell, see findQuoteTable) get the plain value.
+  // formula is only added when there's an actual, plain-numeric source cell to
+  // reference: rows without any source cell at all (e.g. a "Requested Start
+  // Date" sub-line with no price column at all — possible again now that the
+  // table end is anchored on "Part Number" instead of the source cell, see
+  // findQuoteTable) OR whose source cell holds text (e.g. Cisco's "--"
+  // placeholder) get the plain value instead. A formula referencing a text cell
+  // (e.g. ROUND(O99/...) where O99 is "--") divides text by a number, which
+  // Excel evaluates to #VALUE! on open, silently overwriting the correct 0,00 €
+  // cached here — reproduced with a real quote and verified fixed.
   for (const { row, value, sourceCell } of dataRows) {
     const eur = roundToCents(value / rate);
     const cell = sheetDoc.createElementNS(NS, 'c');
     cell.setAttribute('r', `${newColLetters}${row.getAttribute('r')}`);
     cell.setAttribute('s', yellowDataStyle);
-    if (rateCellRef && sourceCell) {
+    if (rateCellRef && sourceCell && !sourceCell.getAttribute('t')) {
       const fEl = sheetDoc.createElementNS(NS, 'f');
       fEl.textContent = `ROUND(${sourceCell.getAttribute('r')}/${rateCellRef},2)`;
       cell.appendChild(fEl);
