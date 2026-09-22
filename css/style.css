@@ -52,6 +52,31 @@
 /* ─── Button (volle Breite, sonst Default-.btn aus design-components.css) ── */
 .btn-block { display: flex; width: 100%; }
 
+/* ─── Kurs-Refresh-Button (sitzt im .field-Wrapper, der laut
+   design-components.css bereits position:relative hat) ────────────────── */
+#rate-input { padding-right: 40px; }
+.field-refresh-button {
+  position: absolute;
+  top: 50%;
+  right: 6px;
+  transform: translateY(-50%);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  border-radius: 50%;
+  color: var(--md-on-surface-variant);
+  cursor: pointer;
+}
+.field-refresh-button:hover:not(:disabled) { background: var(--md-surface-2); }
+.field-refresh-button:disabled { opacity: 0.5; cursor: not-allowed; }
+.field-refresh-button svg.i { width: 20px; height: 20px; }
+.rate-fetch-status { margin-top: -8px; }
+
 /* ─── Status (data-state statt fester .status-Klassen, siehe app.js) ──── */
 .status {
   display: flex;

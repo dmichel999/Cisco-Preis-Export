@@ -74,3 +74,15 @@ Die File System Access API (`showSaveFilePicker`) erlaubt in Chromium-Browsern e
 ## Warum keine Server-Komponente
 
 Cisco-Quotes enthalten kundenbezogene und kommerziell sensible Preisdaten. Eine reine Client-Lösung schließt Datenabfluss technisch aus, statt sich auf Prozessdisziplin zu verlassen.
+
+**Der automatische Kursabruf (siehe unten) ist davon unberührt:** Es ist ein reiner GET auf eine öffentliche Kurs-API, ohne jede Quote-/Kundendaten im Request. Das Prinzip bezieht sich auf *ausgehende* Daten, nicht auf das Nachladen einer öffentlichen Referenzinformation.
+
+## Automatischer Wechselkurs: Frankfurter API statt finanzen.net
+
+Ursprünglich wurde finanzen.net als Quelle für den automatischen USD/EUR-Kurs angefragt. Das scheitert an harter Bot-Erkennung (Akamai): Selbst ein einfacher `curl` mit regulärem Browser-User-Agent bekommt `403 Access Denied` — programmatischer Zugriff ist dort nicht vorgesehen, ein Client-seitiger `fetch()` aus dem Tool wäre denselben Weg gegangen.
+
+Stattdessen liefert die [Frankfurter API](https://frankfurter.dev) (`api.frankfurter.app`) den täglichen EUR/USD-Referenzkurs der Europäischen Zentralbank: kostenlos, ohne API-Key, mit offenem `Access-Control-Allow-Origin: *` — verifiziert per `curl -I`. Der Kurs wird beim Öffnen des Tools automatisch geladen und als Vorschlag ins Kurs-Feld eingetragen (`bindRateAutoFetch` in `js/app.js`), bleibt aber jederzeit von Hand überschreibbar — er ersetzt nur den Ausgangswert, nicht die manuelle Eingabe als Fallback.
+
+Dafür musste die CSP (`connect-src`) von `'none'` auf `'self' https://api.frankfurter.app` erweitert werden — die einzige externe Verbindung, die dieses Tool überhaupt aufbaut.
+
+**Bekannte Einschränkung: funktioniert nur in Chromium-Browsern.** Safari (WebKit) blockt `fetch()`/`XMLHttpRequest` von `file://`-Seiten zu externen Hosts grundsätzlich — unabhängig von CORS-Headern des Ziels, unabhängig von der CSP. Verifiziert mit einer isolierten Minimal-Testseite (nur `fetch()`, kein sonstiger Code): identischer `Load failed`-Fehler wie im echten Tool. Das ist keine Fehlkonfiguration, sondern eine bewusste WebKit-Sicherheitsrestriktion für lokale Dateien und nicht umgehbar, ohne das "kein Server"-Grundprinzip aufzugeben. In Safari degradiert das Feature deshalb kontrolliert: `bindRateAutoFetch` fängt den Fehler ab und zeigt "Kurs konnte nicht automatisch geladen werden — bitte manuell eingeben"; das Tool bleibt voll funktionsfähig, nur ohne den Komfort-Vorschlag.

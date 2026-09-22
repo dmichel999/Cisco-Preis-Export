@@ -2,6 +2,18 @@
 
 Format nach [Keep a Changelog](https://keepachangelog.com/de/1.0.0/), Versionierung nach [SemVer](https://semver.org/lang/de/).
 
+## [0.19.0] - 2026-09-22
+
+### Added
+
+- Automatischer Wechselkurs-Vorschlag beim Öffnen des Tools: lädt den aktuellen EUR/USD-Referenzkurs der Europäischen Zentralbank über die [Frankfurter API](https://frankfurter.dev) (kostenlos, kein API-Key, CORS-offen) und trägt ihn ins Kurs-Feld ein. Jederzeit von Hand überschreibbar; über einen Refresh-Button neben dem Feld erneut abrufbar. Schlägt der Abruf fehl (kein Netzwerk, API nicht erreichbar), bleibt die bisherige manuelle Eingabe unverändert möglich — kein Blocker.
+- **Nicht finanzen.net:** Ursprünglich als Quelle angefragt, blockt aber automatisierte Zugriffe hart per Akamai-Bot-Schutz (403 "Access Denied", auch mit regulärem Browser-User-Agent — verifiziert per curl). Die Frankfurter API liefert denselben Zweck (öffentlicher, tagesaktueller Referenzkurs) ohne dieses Problem.
+- **Bekannte Einschränkung:** Funktioniert nur in Chromium-Browsern (Chrome/Edge). Safari blockt `fetch()` von `file://`-Seiten zu externen Servern grundsätzlich (WebKit-Sicherheitsrestriktion, nicht umgehbar) — dort erscheint zuverlässig der Fehlerhinweis und die manuelle Eingabe bleibt der einzige Weg. Das ist eine bewusst in Kauf genommene Verschlechterung nur des Komfort-Features, nicht der Kernfunktion.
+
+### Changed
+
+- CSP `connect-src` von `'none'` auf `'self' https://api.frankfurter.app` erweitert — einzige externe Verbindung des Tools, ausschließlich ein GET auf eine öffentliche Kurs-API. Keine Quote-/Kundendaten verlassen dabei den Browser; das ursprüngliche "keine Server-Komponente"-Prinzip (siehe architecture.md) bezieht sich auf ausgehende Kundendaten, nicht auf eingehende öffentliche Referenzdaten.
+
 ## [0.18.0] - 2026-09-22
 
 Erneuter, diesmal verifizierter Anlauf für die Subscription-Hinweis-Spalte. v0.17.0 (18.09.) hatte die Tabellenende-Erkennung von "erste nicht-numerische Quellzelle" auf "Spalte Part Number" umgestellt — das war keine reine Ergänzung, sondern eine Änderung der von "Price EUR" genutzten Kernlogik, die in der Praxis zu falschen/fehlenden Berechnungen führte. `js/app.js` wurde daher exakt auf den zuletzt bestätigt funktionierenden Stand v0.9.0 zurückgesetzt; die Subscription-Spalte wurde als komplett separater, additiver Layer obendrauf neu gebaut (eigene Lese-Funktion für "Pricing Term", eigener Berechnungsblock nach der unveränderten Preis-Schleife) und diesmal vor dem Release per Test-Harness gegen zwei synthetische Quotes verifiziert (mit und ohne Pricing-Term-Spalte).

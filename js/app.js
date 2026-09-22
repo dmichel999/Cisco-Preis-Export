@@ -1,7 +1,7 @@
 // thought up by human, coded by ai
 'use strict';
 
-const APP_VERSION = '0.18.0';
+const APP_VERSION = '0.19.0';
 
 const HEADER_TEXT_CREDITS = 'Credits';
 const HEADER_TEXT_CUSTOM_NAME = 'Custom Name';
@@ -130,6 +130,30 @@ function formatDateDE(date) {
   const dd = String(date.getDate()).padStart(2, '0');
   const mm = String(date.getMonth() + 1).padStart(2, '0');
   return `${dd}.${mm}.${date.getFullYear()}`;
+}
+
+// EZB-Referenzkurs (kostenlos, kein API-Key, CORS-offen) — nicht finanzen.net:
+// das blockt automatisierte Zugriffe hart per Akamai-Bot-Schutz (403 "Access
+// Denied", auch mit regulärem Browser-User-Agent). Nur ein GET auf eine
+// öffentliche Kurs-API, keine Quote-/Kundendaten verlassen dabei den Browser.
+const FX_API_URL = 'https://api.frankfurter.app/latest?from=EUR&to=USD';
+
+async function fetchEurUsdRate() {
+  let res;
+  try {
+    res = await fetch(FX_API_URL);
+  } catch (err) {
+    throw new Error('Kurs-API nicht erreichbar (kein Netzwerk?).');
+  }
+  if (!res.ok) throw new Error(`Kurs-API antwortete mit Status ${res.status}.`);
+  const data = await res.json();
+  const rate = data && data.rates && data.rates.USD;
+  if (typeof rate !== 'number' || !Number.isFinite(rate) || rate <= 0) {
+    throw new Error('Kurs-API lieferte keinen gültigen Kurs.');
+  }
+  const m = typeof data.date === 'string' ? data.date.match(/^(\d{4})-(\d{2})-(\d{2})$/) : null;
+  const date = m ? new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3])) : null;
+  return { rate, date };
 }
 
 function serializeWithDeclaration(doc) {
@@ -620,6 +644,8 @@ function initUI() {
   const dropZoneText = document.getElementById('drop-zone-text');
   const fileInput = document.getElementById('file-input');
   const rateInput = document.getElementById('rate-input');
+  const rateRefreshButton = document.getElementById('rate-refresh-button');
+  const rateFetchStatus = document.getElementById('rate-fetch-status');
   const processButton = document.getElementById('process-button');
   const status = document.getElementById('status');
   const footerVersionEl = document.getElementById('app-footer-version');
@@ -629,6 +655,7 @@ function initUI() {
   if (headerVersionEl) headerVersionEl.textContent = `v${APP_VERSION}`;
 
   bindThemeToggle();
+  bindRateAutoFetch(rateInput, rateRefreshButton, rateFetchStatus);
 
   let selectedFile = null;
 
@@ -711,6 +738,52 @@ function initUI() {
       processButton.disabled = false;
     }
   });
+}
+
+// ─── Automatischer EZB-Kurs (EUR/USD) ─────────────────────────────────────
+// Lädt beim Start still einen Vorschlagswert in rate-input, ohne die Feld-
+// Freigabe-Logik in initUI zu berühren (Feld bleibt bis zur Dateiauswahl
+// disabled, zeigt den Wert aber schon an). Rein additiv, jederzeit von Hand
+// überschreibbar — auch bei Fetch-Fehler bleibt manuelle Eingabe möglich.
+function bindRateAutoFetch(rateInput, rateRefreshButton, rateFetchStatus) {
+  if (!rateInput || !rateRefreshButton || !rateFetchStatus) return;
+
+  function setRateFetchStatus(message, state) {
+    rateFetchStatus.textContent = '';
+    if (state) rateFetchStatus.setAttribute('data-state', state);
+    else rateFetchStatus.removeAttribute('data-state');
+    if (!message) return;
+    if (state === 'error' || state === 'success') {
+      const icon = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+      icon.setAttribute('class', 'i');
+      const use = document.createElementNS('http://www.w3.org/2000/svg', 'use');
+      use.setAttribute('href', 'icons/icon-sprite.svg#' + (state === 'success' ? 'ic-check-circle' : 'ic-error'));
+      icon.appendChild(use);
+      rateFetchStatus.appendChild(icon);
+    }
+    const span = document.createElement('span');
+    span.textContent = message;
+    rateFetchStatus.appendChild(span);
+  }
+
+  async function loadRate() {
+    rateRefreshButton.disabled = true;
+    setRateFetchStatus('Kurs wird geladen…', null);
+    try {
+      const { rate, date } = await fetchEurUsdRate();
+      rateInput.value = rate.toFixed(4).replace('.', ',');
+      const dateHint = date ? ` (EZB-Referenzkurs vom ${formatDateDE(date)})` : '';
+      setRateFetchStatus(`Kurs automatisch geladen${dateHint} — bei Bedarf überschreiben.`, 'success');
+    } catch (err) {
+      console.error(err);
+      setRateFetchStatus('Kurs konnte nicht automatisch geladen werden — bitte manuell eingeben.', 'error');
+    } finally {
+      rateRefreshButton.disabled = false;
+    }
+  }
+
+  rateRefreshButton.addEventListener('click', loadRate);
+  loadRate();
 }
 
 // ─── Theme toggle (Hell/Automatisch/Dunkel, wie im Bechtle Design System
