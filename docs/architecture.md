@@ -41,7 +41,7 @@ Die gewählte Quellzelle wird in `dataRow.sourceCell` abgelegt — dieselbe Zell
 
 ### Subscription-Hinweis: eigene Spalte statt Text in der Preis-Zelle
 
-Ist "Pricing Term (in Months)" für eine Zeile eine Zahl > 0 (Subscription-Lizenz statt Einmalkauf), bekommt sie eine zusätzliche Zelle in einer neuen Spalte direkt hinter "Price EUR" mit dem Text "Der Einzelpreis pro X Monate = Y". Der Hinweistext landet bewusst in einer **eigenen Spalte**, nicht in der "Price EUR"-Zelle selbst: Diese trägt eine echte Formel (siehe oben) — würde man dort zusätzlich Text anhängen, müsste die Zelle zu einem festen Textwert werden und die Formel (und damit die automatische Neuberechnung bei Kursänderung) ginge verloren.
+Ist "Pricing Term (in Months)" für eine Zeile eine Zahl > 0 (Subscription-Lizenz statt Einmalkauf), bekommt sie eine zusätzliche Zelle in einer neuen Spalte direkt hinter "Price EUR" mit dem Text "Einzelpreis pro X Monate = Y". Der Hinweistext landet bewusst in einer **eigenen Spalte**, nicht in der "Price EUR"-Zelle selbst: Diese trägt eine echte Formel (siehe oben) — würde man dort zusätzlich Text anhängen, müsste die Zelle zu einem festen Textwert werden und die Formel (und damit die automatische Neuberechnung bei Kursänderung) ginge verloren.
 
 **Y ist exakt der für diese Zeile bereits berechnete "Price EUR"-Wert** — keine andere Spalte (insbesondere nicht "Unit List Price") wird eigens dafür herangezogen. Die Quellzelle dahinter ist bei Subscription-Zeilen seit 0.21.0 "Unit Net Price" statt "Unit Net Price Before Credits" (siehe oben) — für den Hinweistext selbst ändert das nichts, Y bleibt einfach der bereits berechnete Wert.
 

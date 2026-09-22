@@ -1,7 +1,7 @@
 // thought up by human, coded by ai
 'use strict';
 
-const APP_VERSION = '0.22.1';
+const APP_VERSION = '0.22.2';
 
 const HEADER_TEXT_CREDITS = 'Credits';
 const HEADER_TEXT_CUSTOM_NAME = 'Custom Name';
@@ -718,7 +718,7 @@ async function processFile(file, rate) {
       noteCell.setAttribute('t', 'inlineStr');
       const noteIsEl = sheetDoc.createElementNS(NS, 'is');
       const noteTextEl = sheetDoc.createElementNS(NS, 't');
-      noteTextEl.textContent = `Der Einzelpreis pro ${months} Monate = ${eurFormatted}`;
+      noteTextEl.textContent = `Einzelpreis pro ${months} Monate = ${eurFormatted}`;
       noteIsEl.appendChild(noteTextEl);
       noteCell.appendChild(noteIsEl);
       upsertCellInOrder(row, noteCell, noteColIndex);

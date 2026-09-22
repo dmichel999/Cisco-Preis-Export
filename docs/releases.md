@@ -2,6 +2,12 @@
 
 Format nach [Keep a Changelog](https://keepachangelog.com/de/1.0.0/), Versionierung nach [SemVer](https://semver.org/lang/de/).
 
+## [0.22.2] - 2026-09-22
+
+### Changed
+
+- Subscription-Hinweistext beginnt nicht mehr mit "Der" — "Einzelpreis pro X Monate = Y" statt "Der Einzelpreis pro X Monate = Y".
+
 ## [0.22.1] - 2026-09-22
 
 ### Fixed
