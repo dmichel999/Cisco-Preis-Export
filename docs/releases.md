@@ -2,6 +2,18 @@
 
 Format nach [Keep a Changelog](https://keepachangelog.com/de/1.0.0/), Versionierung nach [SemVer](https://semver.org/lang/de/).
 
+## [0.23.0] - 2026-09-23
+
+Ausgelöst durch eine vom User exportierte ISE-Quote mit `0,00 €` bei allen Zeilen und ohne "Quote Total (EUR)"-Spalte. Analyse ergab: Die Datei war mit einem Tool-Stand von vor dem 22.09.2026 verarbeitet worden (vermutlich ein seitdem durchgehend offener, nicht neu geladener Browser-Tab) — mit dem aktuellen Code liefert dieselbe Quote korrekte Werte. Trotzdem zwei echte Verbesserungen dabei gefunden:
+
+### Added
+
+- **Kurs wird jetzt automatisch direkt vor jedem Export erneut geladen**, nicht mehr nur einmal beim Öffnen der Seite. Bisher blieb bei einer lange offenen Browser-Session der beim Start geladene (oder zuletzt manuell eingegebene) Kurs für alle folgenden Exports stehen, auch wenn er inzwischen veraltet war. Schlägt der Abruf fehl, bleibt der zuletzt geladene/manuell eingegebene Wert erhalten, die Verarbeitung läuft trotzdem weiter.
+
+### Changed
+
+- **`findQuoteTotalCell` verlässt sich nicht mehr auf einen zweiten, unabhängigen Spalten-Anker** ("Special Items Total"-Kopfzeile) — nimmt stattdessen die rechteste plain-numerische Zelle direkt aus der Zeile mit dem "Quote Total"-Label. Robuster gegen Quotes mit mehreren unabhängigen Financial-Summary-Blöcken auf einem Blatt, deren Wertspalten nicht übereinstimmen (siehe docs/bugs.md). Bei der als Testfall verwendeten realen ISE-Quote lieferte die alte Logik zufällig denselben korrekten Wert — kein akuter Fehlerfall bei dieser Datei, aber ein unnötig fragiles Kopplungsdetail.
+
 ## [0.22.2] - 2026-09-22
 
 ### Changed

@@ -1,7 +1,7 @@
 // thought up by human, coded by ai
 'use strict';
 
-const APP_VERSION = '0.22.2';
+const APP_VERSION = '0.23.0';
 
 const HEADER_TEXT_CREDITS = 'Credits';
 const HEADER_TEXT_CUSTOM_NAME = 'Custom Name';
@@ -374,16 +374,27 @@ function findQuoteTable(sheetDoc, sharedStrings) {
 // Artikelzeile "--"/0 in "Unit Net Price Before Credits" — der reale Gesamtpreis
 // steht dort nicht pro Zeile, sondern separat im "Financial Summary"-Block weiter
 // oben im Blatt, in einer Zeile mit Label "Quote Total". Komplett eigenständig von
-// findQuoteTable: sucht zwei Text-Anker über das ganze Blatt (wie "Credits" oben),
-// no-op statt Fehler, wenn eine der beiden Ankertexte fehlt (normale Quotes ohne
-// diesen Block bleiben unberührt).
+// findQuoteTable: sucht nur einen Text-Anker ("Quote Total", wie "Credits" oben)
+// und nimmt davon die rechteste plain-numerische Zelle DERSELBEN Zeile als Wert.
+// No-op statt Fehler, wenn der Ankertext fehlt (normale Quotes ohne diesen Block
+// bleiben unberührt).
+//
+// Frühere Version verließ sich zusätzlich auf einen zweiten, unabhängigen
+// Spalten-Anker ("Special Items Total"-Kopfzeile) und nahm an, dessen Spalte
+// enthalte auch den "Quote Total"-Wert. Bei einer realen ISE-Quote liegen
+// "Special Items Total" (Spalte J, obere Mini-Tabelle mit "... List Price" /
+// "Discount %" / "Special Items Total"-Kopfzeile) und die "Quote Total"-Zeile
+// (Spalte K, eigener, darunterliegender Financial-Summary-Block ohne eigene
+// Kopfzeile — nur Label/Wert-Paare) in zwei komplett getrennten Tabellen mit
+// unterschiedlichen Wertspalten — der Spalten-Anker traf nie, die Umrechnung
+// blieb für diese Quote stumm aus. Reproduziert und gefixt anhand der realen
+// Quote (siehe docs/bugs.md).
 function findQuoteTotalCell(sheetDoc, sharedStrings) {
   const sheetDataEl = sheetDoc.getElementsByTagName('sheetData')[0];
   if (!sheetDataEl) return null;
   const rows = Array.from(sheetDataEl.getElementsByTagName('row'));
 
   let totalLabelRow = null;
-  let totalValueCol = null;
   for (const row of rows) {
     for (const c of row.getElementsByTagName('c')) {
       if (resolveCellText(c, sharedStrings) === HEADER_TEXT_QUOTE_TOTAL_LABEL) {
@@ -393,34 +404,27 @@ function findQuoteTotalCell(sheetDoc, sharedStrings) {
     }
     if (totalLabelRow) break;
   }
-  for (const row of rows) {
-    for (const c of row.getElementsByTagName('c')) {
-      if (resolveCellText(c, sharedStrings) === HEADER_TEXT_SPECIAL_ITEMS_TOTAL) {
-        const ref = parseCellRef(c.getAttribute('r'));
-        if (ref) totalValueCol = ref.colIndex;
-        break;
-      }
-    }
-    if (totalValueCol != null) break;
-  }
-  if (!totalLabelRow || totalValueCol == null) return null;
+  if (!totalLabelRow) return null;
 
-  const totalValueLetters = colIndexToLetters(totalValueCol);
+  // Rechteste plain-numerische Zelle der Zeile — der Betrag steht bei diesem
+  // Block-Typ direkt neben (oder mehrere Spalten hinter) dem Label, ohne
+  // verlässlichen Spaltenbezug zu einer Kopfzeile anderswo im Blatt.
   let sourceCell = null;
+  let sourceColIndex = -1;
   for (const c of totalLabelRow.getElementsByTagName('c')) {
+    if (c.getAttribute('t')) continue;
+    const vEl = c.getElementsByTagName('v')[0];
+    if (!vEl) continue;
+    const parsed = parseFloat(vEl.textContent);
+    if (Number.isNaN(parsed)) continue;
     const ref = parseCellRef(c.getAttribute('r'));
-    if (ref && ref.letters === totalValueLetters) {
+    if (ref && ref.colIndex > sourceColIndex) {
+      sourceColIndex = ref.colIndex;
       sourceCell = c;
-      break;
     }
   }
-  // Nur eine plain-numerische Zelle taugt als Quelle — sonst bleibt das Feature
-  // stiller No-op statt eines falschen/geratenen Werts.
-  if (!sourceCell || sourceCell.getAttribute('t')) return null;
-  const vEl = sourceCell.getElementsByTagName('v')[0];
-  if (!vEl) return null;
-  const value = parseFloat(vEl.textContent);
-  if (Number.isNaN(value)) return null;
+  if (!sourceCell) return null;
+  const value = parseFloat(sourceCell.getElementsByTagName('v')[0].textContent);
 
   return { row: totalLabelRow, sourceCell, value };
 }
@@ -885,7 +889,7 @@ function initUI() {
   if (headerVersionEl) headerVersionEl.textContent = `v${APP_VERSION}`;
 
   bindThemeToggle();
-  bindRateAutoFetch(rateInput, rateRefreshButton, rateFetchStatus);
+  const refreshRate = bindRateAutoFetch(rateInput, rateRefreshButton, rateFetchStatus);
 
   let selectedFile = null;
 
@@ -942,6 +946,14 @@ function initUI() {
   processButton.addEventListener('click', async () => {
     processButton.disabled = true;
     try {
+      // Vor jedem Export den aktuellen Kurs neu ziehen statt den beim Seitenaufruf
+      // geladenen (ggf. längst veralteten) Wert weiterzuverwenden — bleibt die Seite
+      // über mehrere Exports hinweg offen, wäre der Kurs sonst nur beim ersten Mal
+      // aktuell. Schlägt der Abruf fehl, bleibt der zuletzt geladene/manuell
+      // eingegebene Wert im Feld stehen (siehe bindRateAutoFetch), Verarbeitung läuft
+      // damit weiter.
+      setStatus('Kurs wird aktualisiert…', null);
+      await refreshRate();
       const rateRaw = rateInput.value.trim().replace(',', '.');
       const rate = parseFloat(rateRaw);
       if (!rateRaw || !Number.isFinite(rate) || rate <= 0) {
@@ -1019,6 +1031,11 @@ function bindRateAutoFetch(rateInput, rateRefreshButton, rateFetchStatus) {
   // rateInput.value oben in loadRate() nicht, daher kein Konflikt.
   rateInput.addEventListener('input', () => setRateFetchStatus('', null));
   loadRate();
+
+  // Rückgabe an initUI, damit der Kurs auch direkt vor jedem Export erneut
+  // gezogen werden kann (nicht nur einmalig beim Laden der Seite oder per
+  // manuellem Klick auf den Refresh-Button).
+  return loadRate;
 }
 
 // ─── Theme toggle (Hell/Automatisch/Dunkel, wie im Bechtle Design System
