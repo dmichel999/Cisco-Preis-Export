@@ -488,7 +488,7 @@ tbody tr:hover { background: var(--md-surface-2); }
 td.mono { font-family: var(--mono); word-break: break-all; }
 
 td.actions { text-align: right; white-space: nowrap; width: 1%; }
-td.actions .btn-row { justify-content: flex-end; gap: 2px; }
+td.actions .btn-row { justify-content: flex-end; flex-wrap: nowrap; gap: 2px; }
 
 tr.editing { background: var(--md-surface-3); }
 tr.editing input {
